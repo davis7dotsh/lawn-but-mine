@@ -15,6 +15,7 @@ import {
   buildMuxPlaybackUrl,
   buildMuxThumbnailUrl,
   createMuxAssetFromInputUrl,
+  deleteMuxAsset,
   createPublicPlaybackId,
   getMuxAsset,
 } from "./mux";
@@ -166,6 +167,64 @@ function buildPublicPlaybackSession(
   };
 }
 
+function getMuxErrorMessage(data: unknown): string | undefined {
+  const record = data as {
+    errors?: Array<{ message?: string }>;
+    error?: { message?: string };
+  };
+
+  return record.errors?.find((item) => typeof item?.message === "string")?.message
+    ?? (typeof record.error?.message === "string" ? record.error.message : undefined);
+}
+
+function getPreferredPlaybackId(
+  playbackIds: Array<{ id?: string; policy?: string }> | undefined | null,
+) {
+  if (!playbackIds || playbackIds.length === 0) return undefined;
+
+  const publicPlaybackId = playbackIds.find((entry) => entry.policy === "public" && entry.id)?.id;
+  if (publicPlaybackId) return publicPlaybackId;
+
+  const signedPlaybackId = playbackIds.find((entry) => entry.policy === "signed" && entry.id)?.id;
+  if (signedPlaybackId) return signedPlaybackId;
+
+  return playbackIds.find((entry) => typeof entry.id === "string")?.id;
+}
+
+async function startMuxIngestFromOriginal(
+  ctx: ActionCtx,
+  args: {
+    videoId: Id<"videos">;
+    s3Key: string;
+    previousMuxAssetId?: string;
+  },
+) {
+  if (args.previousMuxAssetId) {
+    try {
+      await deleteMuxAsset(args.previousMuxAssetId);
+    } catch {
+      // Ignore cleanup failures and continue with a fresh ingest attempt.
+    }
+  }
+
+  await ctx.runMutation(internal.videos.markAsProcessing, {
+    videoId: args.videoId,
+  });
+
+  const ingestUrl = await buildSignedBucketObjectUrl(args.s3Key, {
+    expiresIn: 60 * 60 * 24,
+  });
+  const asset = await createMuxAssetFromInputUrl(args.videoId, ingestUrl);
+  if (!asset.id) {
+    throw new Error("Mux did not return an asset id.");
+  }
+
+  await ctx.runMutation(internal.videos.setMuxAssetReference, {
+    videoId: args.videoId,
+    muxAssetId: asset.id,
+  });
+}
+
 async function ensurePublicPlaybackId(
   ctx: ActionCtx,
   params: {
@@ -292,20 +351,10 @@ export const markUploadComplete = action({
         contentType: normalizedContentType,
       });
 
-      await ctx.runMutation(internal.videos.markAsProcessing, {
+      await startMuxIngestFromOriginal(ctx, {
         videoId: args.videoId,
+        s3Key: video.s3Key,
       });
-
-      const ingestUrl = await buildSignedBucketObjectUrl(video.s3Key, {
-        expiresIn: 60 * 60 * 24,
-      });
-      const asset = await createMuxAssetFromInputUrl(args.videoId, ingestUrl);
-      if (asset.id) {
-        await ctx.runMutation(internal.videos.setMuxAssetReference, {
-          videoId: args.videoId,
-          muxAssetId: asset.id,
-        });
-      }
     } catch (error) {
       const shouldDeleteObject = shouldDeleteUploadedObjectOnFailure(error);
       if (shouldDeleteObject) {
@@ -351,6 +400,136 @@ export const markUploadFailed = action({
       videoId: args.videoId,
       uploadError: "Upload failed before Mux could process the asset.",
     });
+
+    return { success: true };
+  },
+});
+
+export const pollMuxProcessingStatus = action({
+  args: { videoId: v.id("videos") },
+  returns: v.object({
+    status: v.union(
+      v.literal("uploading"),
+      v.literal("processing"),
+      v.literal("ready"),
+      v.literal("failed"),
+    ),
+    uploadError: v.optional(v.string()),
+  }),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{
+    status: "uploading" | "processing" | "ready" | "failed";
+    uploadError?: string;
+  }> => {
+    const video = await ctx.runQuery(api.videos.getVideoForPlayback, {
+      videoId: args.videoId,
+    }) as {
+      status: "uploading" | "processing" | "ready" | "failed";
+      muxAssetId?: string;
+      uploadError?: string;
+    } | null;
+
+    if (!video) {
+      throw new Error("Video not found");
+    }
+
+    if (video.status !== "processing" || !video.muxAssetId) {
+      return {
+        status: video.status,
+        uploadError: video.uploadError,
+      };
+    }
+
+    const asset = await getMuxAsset(video.muxAssetId);
+    const muxAsset = asset as unknown as {
+      status?: string;
+      playback_ids?: Array<{ id?: string; policy?: string }>;
+      duration?: number;
+      errors?: Array<{ message?: string }>;
+      error?: { message?: string };
+    };
+
+    if (muxAsset.status === "ready") {
+      const playbackId =
+        getPreferredPlaybackId(muxAsset.playback_ids)
+        ?? (await createPublicPlaybackId(video.muxAssetId)).id;
+
+      if (!playbackId) {
+        return {
+          status: "processing",
+          uploadError: video.uploadError,
+        };
+      }
+
+      await ctx.runMutation(internal.videos.markAsReady, {
+        videoId: args.videoId,
+        muxAssetId: video.muxAssetId,
+        muxPlaybackId: playbackId,
+        duration: typeof muxAsset.duration === "number" ? muxAsset.duration : undefined,
+        thumbnailUrl: buildMuxThumbnailUrl(playbackId),
+      });
+
+      return {
+        status: "ready",
+        uploadError: undefined,
+      };
+    }
+
+    if (muxAsset.status === "errored") {
+      const uploadError = getMuxErrorMessage(muxAsset) ?? "Mux failed to process this asset.";
+      await ctx.runMutation(internal.videos.markAsFailed, {
+        videoId: args.videoId,
+        uploadError,
+      });
+
+      return {
+        status: "failed",
+        uploadError,
+      };
+    }
+
+    return {
+      status: "processing",
+      uploadError: video.uploadError,
+    };
+  },
+});
+
+export const retryMuxProcessing = action({
+  args: { videoId: v.id("videos") },
+  returns: v.object({
+    success: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    await requireVideoMemberAccess(ctx, args.videoId);
+
+    const video = await ctx.runQuery(api.videos.getVideoForPlayback, {
+      videoId: args.videoId,
+    });
+
+    if (!video || !video.s3Key) {
+      throw new Error("Original bucket file not found for this video");
+    }
+
+    try {
+      await startMuxIngestFromOriginal(ctx, {
+        videoId: args.videoId,
+        s3Key: video.s3Key,
+        previousMuxAssetId: video.muxAssetId ?? undefined,
+      });
+    } catch (error) {
+      const uploadError =
+        error instanceof Error
+          ? error.message
+          : "Retry failed to start Mux processing.";
+      await ctx.runMutation(internal.videos.markAsFailed, {
+        videoId: args.videoId,
+        uploadError,
+      });
+      throw error;
+    }
 
     return { success: true };
   },

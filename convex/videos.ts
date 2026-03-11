@@ -336,7 +336,11 @@ export const markAsProcessing = internalMutation({
   handler: async (ctx, args) => {
     await ctx.db.patch(args.videoId, {
       status: "processing",
+      muxAssetId: undefined,
+      muxPlaybackId: undefined,
       muxAssetStatus: "preparing",
+      duration: undefined,
+      thumbnailUrl: undefined,
       uploadError: undefined,
     });
   },

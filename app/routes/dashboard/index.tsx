@@ -13,6 +13,7 @@ import { prewarmProject } from "./-project.data";
 import { useDashboardIndexData } from "./-index.data";
 import { Id } from "@convex/_generated/dataModel";
 import { DashboardHeader } from "@/components/DashboardHeader";
+import { getDashboardBillingLabel } from "@/shared/billingPlans";
 
 export const Route = createFileRoute("/dashboard/")({
   component: DashboardPage,
@@ -27,27 +28,6 @@ type DashboardProjectCardProps = {
   };
   onOpen: () => void;
 };
-
-function formatTeamPlanLabel(
-  plan: string,
-  billingStatus?: string,
-  stripeSubscriptionId?: string,
-) {
-  if (!stripeSubscriptionId && billingStatus !== "active") {
-    return "Unpaid";
-  }
-
-  if (
-    billingStatus &&
-    billingStatus !== "active" &&
-    billingStatus !== "trialing" &&
-    billingStatus !== "past_due"
-  ) {
-    return "Unpaid";
-  }
-  if (plan === "pro" || plan === "team") return "Pro";
-  return "Basic";
-}
 
 function DashboardProjectCard({
   teamSlug,
@@ -154,11 +134,7 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-3">
                     <h2 className="text-xl font-black text-[#1a1a1a]">{team.name}</h2>
                     <Badge variant="secondary">
-                      {formatTeamPlanLabel(
-                        team.plan,
-                        team.billingStatus,
-                        team.stripeSubscriptionId,
-                      )}
+                      {getDashboardBillingLabel(team.plan, team.billingStatus)}
                     </Badge>
                   </div>
                   <div className="flex items-center gap-4">
