@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
 import { getUser, identityAvatarUrl, identityEmail, identityName, requireUser, requireTeamAccess } from "./auth";
 import { getTeamSubscriptionState } from "./billingHelpers";
 
@@ -459,19 +459,5 @@ export const deleteTeam = mutation({
     }
 
     await ctx.db.delete(args.teamId);
-  },
-});
-
-export const linkStripeCustomer = internalMutation({
-  args: {
-    teamId: v.id("teams"),
-    stripeCustomerId: v.string(),
-  },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    await ctx.db.patch(args.teamId, {
-      stripeCustomerId: args.stripeCustomerId,
-    });
-    return null;
   },
 });

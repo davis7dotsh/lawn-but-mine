@@ -12,12 +12,19 @@ import { useRoutePrewarmIntent } from "@/lib/useRoutePrewarmIntent";
 import { useSettingsData } from "./-settings.data";
 import { prewarmTeam } from "./-team.data";
 import { DashboardHeader } from "@/components/DashboardHeader";
-
-type BillingPlan = "basic" | "pro";
+import {
+  TEAM_PLAN_LABELS,
+  TEAM_PLAN_MONTHLY_PRICE_USD,
+  TEAM_PLAN_SEATS,
+  TEAM_PLAN_STORAGE_LIMIT_BYTES,
+  TEAM_TRIAL_DAYS,
+  normalizeTeamPlan,
+  shouldRefreshBilling,
+  type TeamPlan as BillingPlan,
+} from "@/shared/billingPlans";
 
 const GIBIBYTE = 1024 ** 3;
 const TEBIBYTE = 1024 ** 4;
-const TEAM_TRIAL_DAYS = 7;
 
 const BILLING_PLANS: Record<
   BillingPlan,
@@ -29,22 +36,18 @@ const BILLING_PLANS: Record<
   }
 > = {
   basic: {
-    label: "Basic",
-    monthlyPriceUsd: 5,
-    storageLimitBytes: 100 * GIBIBYTE,
-    seats: "Unlimited",
+    label: TEAM_PLAN_LABELS.basic,
+    monthlyPriceUsd: TEAM_PLAN_MONTHLY_PRICE_USD.basic,
+    storageLimitBytes: TEAM_PLAN_STORAGE_LIMIT_BYTES.basic,
+    seats: TEAM_PLAN_SEATS,
   },
   pro: {
-    label: "Pro",
-    monthlyPriceUsd: 25,
-    storageLimitBytes: TEBIBYTE,
-    seats: "Unlimited",
+    label: TEAM_PLAN_LABELS.pro,
+    monthlyPriceUsd: TEAM_PLAN_MONTHLY_PRICE_USD.pro,
+    storageLimitBytes: TEAM_PLAN_STORAGE_LIMIT_BYTES.pro,
+    seats: TEAM_PLAN_SEATS,
   },
 };
-
-function normalizeTeamPlan(plan: string): BillingPlan {
-  return plan === "pro" || plan === "team" ? "pro" : "basic";
-}
 
 function formatBytes(bytes: number): string {
   if (bytes >= TEBIBYTE) return `${(bytes / TEBIBYTE).toFixed(1)} TB`;
@@ -65,12 +68,9 @@ export default function TeamSettingsPage() {
   const { context, team, members, billing } = useSettingsData({ teamSlug });
   const updateTeam = useMutation(api.teams.update);
   const deleteTeam = useMutation(api.teams.deleteTeam);
-  const createSubscriptionCheckout = useAction(
-    api.billing.createSubscriptionCheckout,
-  );
-  const createCustomerPortalSession = useAction(
-    api.billing.createCustomerPortalSession,
-  );
+  const startCheckout = useAction(api.billing.startCheckout);
+  const openBillingPortal = useAction(api.billing.openBillingPortal);
+  const refreshTeamBilling = useAction(api.billing.refreshTeamBilling);
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState("");
@@ -96,6 +96,22 @@ export default function TeamSettingsPage() {
     }
   }, [shouldCanonicalize, canonicalSettingsPath, navigate]);
 
+  useEffect(() => {
+    if (!team || billing === undefined) return;
+
+    const search = typeof window === "undefined" ? "" : window.location.search;
+    const forceRefresh =
+      search.includes("billing=success") || search.includes("billing=cancel");
+
+    if (!shouldRefreshBilling(billing?.billingLastSyncedAt, forceRefresh)) {
+      return;
+    }
+
+    void refreshTeamBilling({ teamId: team._id }).catch((error) => {
+      console.warn("Billing refresh failed", error);
+    });
+  }, [billing, refreshTeamBilling, team]);
+
   if (context === undefined || shouldCanonicalize) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -119,7 +135,7 @@ export default function TeamSettingsPage() {
   const hasActiveSubscription = billing?.hasActiveSubscription ?? false;
   const subscriptionStatus = billing?.subscriptionStatus ?? "not_subscribed";
   const isTrialing = subscriptionStatus === "trialing";
-  const hasPortalAccess = isOwner && Boolean(billing?.stripeCustomerId);
+  const hasPortalAccess = isOwner && hasActiveSubscription;
   const currentPlanLabel = hasActiveSubscription ? planConfig.label : "Unpaid";
   const canDeleteTeam = isOwner && !hasActiveSubscription;
 
@@ -173,18 +189,24 @@ export default function TeamSettingsPage() {
       const settingsPath = canonicalSettingsPath ?? `/dashboard/${team.slug}/settings`;
       const successUrl = `${window.location.origin}${settingsPath}?billing=success`;
       const cancelUrl = `${window.location.origin}${settingsPath}?billing=cancel`;
-      const session = await createSubscriptionCheckout({
+      const session = await startCheckout({
         teamId: team._id,
         plan: targetPlan,
         successUrl,
         cancelUrl,
       });
 
-      if (!session.url) {
-        throw new Error("Stripe checkout did not return a redirect URL.");
+      if (session.url) {
+        window.location.assign(session.url);
+        return;
       }
 
-      window.location.assign(session.url);
+      if (session.applied) {
+        await refreshTeamBilling({ teamId: team._id });
+        return;
+      }
+
+      throw new Error("Billing checkout did not return a redirect URL.");
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unable to start checkout.";
@@ -202,7 +224,7 @@ export default function TeamSettingsPage() {
     try {
       const settingsPath = canonicalSettingsPath ?? `/dashboard/${team.slug}/settings`;
       const returnUrl = `${window.location.origin}${settingsPath}`;
-      const session = await createCustomerPortalSession({
+      const session = await openBillingPortal({
         teamId: team._id,
         returnUrl,
       });
@@ -212,7 +234,7 @@ export default function TeamSettingsPage() {
       const message =
         error instanceof Error
           ? error.message
-          : "Unable to open Stripe billing portal.";
+          : "Unable to open billing portal.";
       setBillingError(message);
     } finally {
       setIsOpeningPortal(false);

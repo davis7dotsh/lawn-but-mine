@@ -12,15 +12,13 @@ export default defineSchema({
       v.literal("free"),
       v.literal("team")
     ),
-    stripeCustomerId: v.optional(v.string()),
-    stripeSubscriptionId: v.optional(v.string()),
-    stripePriceId: v.optional(v.string()),
     billingStatus: v.optional(v.string()),
+    billingProductId: v.optional(v.string()),
+    billingCurrentPeriodEnd: v.optional(v.number()),
+    billingLastSyncedAt: v.optional(v.number()),
   })
     .index("by_slug", ["slug"])
-    .index("by_owner", ["ownerClerkId"])
-    .index("by_stripe_customer_id", ["stripeCustomerId"])
-    .index("by_stripe_subscription_id", ["stripeSubscriptionId"]),
+    .index("by_owner", ["ownerClerkId"]),
 
   teamMembers: defineTable({
     teamId: v.id("teams"),

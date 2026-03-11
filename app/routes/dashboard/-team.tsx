@@ -1,5 +1,4 @@
-
-import { useConvex, useMutation } from "convex/react";
+import { useAction, useConvex, useMutation } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { useLocation, useNavigate, useParams } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
@@ -35,6 +34,7 @@ import { useRoutePrewarmIntent } from "@/lib/useRoutePrewarmIntent";
 import { prewarmProject } from "./-project.data";
 import { useTeamData } from "./-team.data";
 import { DashboardHeader } from "@/components/DashboardHeader";
+import { shouldRefreshBilling } from "@/shared/billingPlans";
 
 type TeamProjectCardProps = {
   teamSlug: string;
@@ -124,6 +124,7 @@ export default function TeamPage() {
   const { context, team, projects, billing } = useTeamData({ teamSlug });
   const createProject = useMutation(api.projects.create);
   const deleteProject = useMutation(api.projects.remove);
+  const refreshTeamBilling = useAction(api.billing.refreshTeamBilling);
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
@@ -138,6 +139,22 @@ export default function TeamPage() {
       navigate({ to: context.canonicalPath, replace: true });
     }
   }, [shouldCanonicalize, context, navigate]);
+
+  useEffect(() => {
+    if (!team || billing === undefined) return;
+
+    const search = typeof window === "undefined" ? "" : window.location.search;
+    const forceRefresh =
+      search.includes("billing=success") || search.includes("billing=cancel");
+
+    if (!shouldRefreshBilling(billing?.billingLastSyncedAt, forceRefresh)) {
+      return;
+    }
+
+    void refreshTeamBilling({ teamId: team._id }).catch((error) => {
+      console.warn("Billing refresh failed", error);
+    });
+  }, [billing, refreshTeamBilling, team]);
 
   const isLoadingData =
     context === undefined ||

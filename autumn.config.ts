@@ -1,7 +1,12 @@
 import { feature, item, plan } from "atmn";
+import {
+  GIBIBYTE,
+  TEAM_PLAN_MONTHLY_PRICE_USD,
+  TEAM_PLAN_STORAGE_LIMIT_BYTES,
+  TEAM_TRIAL_DAYS,
+} from "./src/shared/billingPlans";
 
 const PLAN_GROUP = "team_subscription";
-const TRIAL_DAYS = 7;
 
 export const seats = feature({
   id: "seats",
@@ -37,11 +42,11 @@ export const basic = plan({
   group: PLAN_GROUP,
   description: "Unlimited everything, except storage.",
   price: {
-    amount: 5,
+    amount: TEAM_PLAN_MONTHLY_PRICE_USD.basic,
     interval: "month",
   },
   freeTrial: {
-    durationLength: TRIAL_DAYS,
+    durationLength: TEAM_TRIAL_DAYS,
     durationType: "day",
     cardRequired: true,
   },
@@ -60,7 +65,7 @@ export const basic = plan({
     }),
     item({
       featureId: storageGb.id,
-      included: 100,
+      included: TEAM_PLAN_STORAGE_LIMIT_BYTES.basic / GIBIBYTE,
     }),
   ],
 });
@@ -71,11 +76,11 @@ export const pro = plan({
   group: PLAN_GROUP,
   description: "The same plan with more storage for bigger files.",
   price: {
-    amount: 25,
+    amount: TEAM_PLAN_MONTHLY_PRICE_USD.pro,
     interval: "month",
   },
   freeTrial: {
-    durationLength: TRIAL_DAYS,
+    durationLength: TEAM_TRIAL_DAYS,
     durationType: "day",
     cardRequired: true,
   },
@@ -94,7 +99,7 @@ export const pro = plan({
     }),
     item({
       featureId: storageGb.id,
-      included: 1024,
+      included: TEAM_PLAN_STORAGE_LIMIT_BYTES.pro / GIBIBYTE,
     }),
   ],
 });

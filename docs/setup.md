@@ -22,15 +22,6 @@ Run only the web app:
 bun run dev:web
 ```
 
-Run only local Convex:
-
-```bash
-bun run dev:convex
-```
-
-If `VITE_CLERK_PUBLISHABLE_KEY` is set, the local Convex prep step will derive
-`CLERK_JWT_ISSUER_DOMAIN` into `.env.local` automatically for Clerk auth.
-
 Run against a hosted Convex deployment instead:
 
 ```bash
@@ -60,14 +51,14 @@ bun run lint
 - `MUX_TOKEN_ID`
 - `MUX_TOKEN_SECRET`
 - `MUX_WEBHOOK_SECRET`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `STRIPE_PRICE_BASIC_MONTHLY`
-- `STRIPE_PRICE_PRO_MONTHLY`
+- `AUTUMN_SECRET_KEY`
+- `AUTUMN_URL` (optional)
 - Convex deployment vars as needed (`CONVEX_DEPLOYMENT`, etc.)
 
-For local development, `bun run dev` injects `VITE_CONVEX_URL=http://127.0.0.1:3210`, so you do not need to hardcode the local Convex URL in your env file.
+For local development, `bun run dev` uses the Convex Vite plugin to start a local backend and inject `VITE_CONVEX_URL=http://127.0.0.1:3210`. You do not need to hardcode the local Convex URL in your env file.
 
-Stripe webhook endpoint (for the Convex Stripe component):
+For Clerk auth, set either `CLERK_JWT_ISSUER_DOMAIN` directly or `VITE_CLERK_PUBLISHABLE_KEY` so the issuer domain can be derived automatically.
 
-- `https://<your-deployment>.convex.site/stripe/webhook`
+Billing plans are configured in `autumn.config.ts`.
+
+The app syncs billing state back into Convex via billing actions on page entry and after checkout/portal returns. No billing webhook endpoint is required.

@@ -66,6 +66,8 @@ export default function VideoPage() {
   const getPlaybackSession = useAction(api.videoActions.getPlaybackSession);
   const getOriginalPlaybackUrl = useAction(api.videoActions.getOriginalPlaybackUrl);
   const getDownloadUrl = useAction(api.videoActions.getDownloadUrl);
+  const pollMuxProcessingStatus = useAction(api.videoActions.pollMuxProcessingStatus);
+  const retryMuxProcessing = useAction(api.videoActions.retryMuxProcessing);
 
   const [currentTime, setCurrentTime] = useState(0);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -80,7 +82,9 @@ export default function VideoPage() {
   const [isLoadingPlayback, setIsLoadingPlayback] = useState(false);
   const [originalPlaybackUrl, setOriginalPlaybackUrl] = useState<string | null>(null);
   const [isLoadingOriginalPlayback, setIsLoadingOriginalPlayback] = useState(false);
+  const [isRetryingProcessing, setIsRetryingProcessing] = useState(false);
   const [preferredSource, setPreferredSource] = useState<"mux720" | "original">("original");
+  const [hasManuallySelectedSource, setHasManuallySelectedSource] = useState(false);
   const playerRef = useRef<VideoPlayerHandle | null>(null);
   const isPlayable = video?.status === "ready" && Boolean(video?.muxPlaybackId);
   const playbackUrl = playbackSession?.url ?? null;
@@ -146,7 +150,7 @@ export default function VideoPage() {
   }, [getPlaybackSession, isPlayable, resolvedVideoId, video?.muxPlaybackId]);
 
   useEffect(() => {
-    if (!resolvedVideoId || !video || video.status === "uploading" || video.status === "failed") {
+    if (!resolvedVideoId || !video || video.status === "uploading") {
       setOriginalPlaybackUrl(null);
       setIsLoadingOriginalPlayback(false);
       return;
@@ -173,6 +177,65 @@ export default function VideoPage() {
       cancelled = true;
     };
   }, [getOriginalPlaybackUrl, resolvedVideoId, video?.status, video?.s3Key]);
+
+  useEffect(() => {
+    setHasManuallySelectedSource(false);
+    setPreferredSource("original");
+  }, [resolvedVideoId]);
+
+  useEffect(() => {
+    if (hasManuallySelectedSource) return;
+    if (playbackUrl) {
+      setPreferredSource("mux720");
+      return;
+    }
+    if (originalPlaybackUrl) {
+      setPreferredSource("original");
+    }
+  }, [hasManuallySelectedSource, originalPlaybackUrl, playbackUrl]);
+
+  useEffect(() => {
+    if (!import.meta.env.DEV || !resolvedVideoId || video?.status !== "processing") {
+      return;
+    }
+
+    let cancelled = false;
+    let timeoutId: number | undefined;
+
+    const schedule = (delayMs: number) => {
+      timeoutId = window.setTimeout(() => {
+        void tick();
+      }, delayMs);
+    };
+
+    const tick = async () => {
+      if (cancelled) return;
+
+      if (document.visibilityState === "hidden") {
+        schedule(12000);
+        return;
+      }
+
+      try {
+        const result = await pollMuxProcessingStatus({ videoId: resolvedVideoId });
+        if (cancelled || result.status !== "processing") return;
+        schedule(5000);
+      } catch (error) {
+        if (cancelled) return;
+        console.warn("Mux status poll failed", error);
+        schedule(10000);
+      }
+    };
+
+    void tick();
+
+    return () => {
+      cancelled = true;
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [pollMuxProcessingStatus, resolvedVideoId, video?.status]);
 
   const handleTimeUpdate = useCallback((time: number) => {
     setCurrentTime(time);
@@ -224,6 +287,19 @@ export default function VideoPage() {
     [resolvedVideoId, updateVideoWorkflowStatus],
   );
 
+  const handleRetryProcessing = useCallback(async () => {
+    if (!resolvedVideoId) return;
+
+    setIsRetryingProcessing(true);
+    try {
+      await retryMuxProcessing({ videoId: resolvedVideoId });
+    } catch (error) {
+      console.error("Failed to retry Mux processing:", error);
+    } finally {
+      setIsRetryingProcessing(false);
+    }
+  }, [resolvedVideoId, retryMuxProcessing]);
+
   const startEditingTitle = () => {
     if (video) {
       setEditedTitle(video.title);
@@ -249,6 +325,7 @@ export default function VideoPage() {
 
   const canEdit = video.role !== "viewer";
   const canComment = true;
+  const canRetryProcessing = canEdit && Boolean(video.s3Key);
 
   return (
     <div className="h-full flex flex-col">
@@ -386,10 +463,32 @@ export default function VideoPage() {
         {/* Video player area — full black, Frame.io style */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-black">
           {video.status === "processing" && isUsingOriginalFallback && activePlaybackUrl ? (
-            <div className="flex-shrink-0 flex items-center gap-2 bg-[#1a1a1a] px-4 py-2 text-sm text-white">
-              <span className="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-[#2d5a2d]" />
+            <div className="flex-shrink-0 flex items-center gap-2 bg-[#1a1a1a] px-4 py-2 text-sm text-[#f0f0e8]">
+              <span className="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-[#7cb87c]" />
               <span className="font-semibold">Original playback active.</span>
-              <span className="text-white/60">720p stream is still encoding.</span>
+              <span className="text-[#888]">720p stream is still encoding.</span>
+            </div>
+          ) : null}
+
+          {video.status === "failed" ? (
+            <div className="flex flex-wrap items-center gap-3 border-b border-[#5f1d1d] bg-[#2a0f12] px-4 py-3 text-sm text-[#f8d7da]">
+              <span className="font-semibold">Mux processing failed.</span>
+              <span className="text-[#d7a6ad]">
+                {video.uploadError ?? "The stream could not be prepared."}
+              </span>
+              {canRetryProcessing ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-[#a33a46] bg-transparent text-[#f8d7da] hover:bg-[#3a161b] hover:text-white"
+                  disabled={isRetryingProcessing}
+                  onClick={() => {
+                    void handleRetryProcessing();
+                  }}
+                >
+                  {isRetryingProcessing ? "Retrying..." : "Retry processing"}
+                </Button>
+              ) : null}
             </div>
           ) : null}
 
@@ -420,6 +519,7 @@ export default function VideoPage() {
               selectedQualityId={activeQualityId}
               onSelectQuality={(id) => {
                 if (id === "mux720" || id === "original") {
+                  setHasManuallySelectedSource(true);
                   setPreferredSource(id);
                 }
               }}
@@ -446,7 +546,22 @@ export default function VideoPage() {
                     </p>
                   )}
                   {video.status === "failed" && (
-                    <p className="text-[#dc2626]">Processing failed</p>
+                    <div className="flex flex-col items-center gap-3">
+                      <p className="text-[#dc2626]">
+                        {video.uploadError ?? "Processing failed"}
+                      </p>
+                      {canRetryProcessing ? (
+                        <Button
+                          variant="outline"
+                          disabled={isRetryingProcessing}
+                          onClick={() => {
+                            void handleRetryProcessing();
+                          }}
+                        >
+                          {isRetryingProcessing ? "Retrying..." : "Retry processing"}
+                        </Button>
+                      ) : null}
+                    </div>
                   )}
                 </div>
               )}
