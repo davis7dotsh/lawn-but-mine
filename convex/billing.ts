@@ -15,9 +15,21 @@ import {
   TEAM_PLAN_STORAGE_LIMIT_BYTES,
 } from "./billingHelpers";
 
-const stripeClient = new StripeSubscriptions(components.stripe, {});
-const stripe = new Stripe(stripeClient.apiKey);
 const TEAM_TRIAL_DAYS = 7;
+let stripeClient: StripeSubscriptions | null = null;
+let stripe: Stripe | null = null;
+
+function getStripeClient() {
+  if (stripeClient) return stripeClient;
+  stripeClient = new StripeSubscriptions(components.stripe, {});
+  return stripeClient;
+}
+
+function getStripe() {
+  if (stripe) return stripe;
+  stripe = new Stripe(getStripeClient().apiKey);
+  return stripe;
+}
 
 const teamPlanValidator = v.union(v.literal("basic"), v.literal("pro"));
 const teamRoleValidator = v.union(
@@ -39,6 +51,8 @@ export const createSubscriptionCheckout = action({
     url: v.union(v.string(), v.null()),
   }),
   handler: async (ctx, args): Promise<{ sessionId: string; url: string | null }> => {
+    const stripeClient = getStripeClient();
+    const stripe = getStripe();
     const identity = await getIdentity(ctx);
     const team = await ctx.runQuery(api.teams.get, { teamId: args.teamId });
 
@@ -133,6 +147,7 @@ export const createCustomerPortalSession = action({
     url: v.string(),
   }),
   handler: async (ctx, args): Promise<{ url: string }> => {
+    const stripeClient = getStripeClient();
     const team = await ctx.runQuery(api.teams.get, { teamId: args.teamId });
 
     if (!team) {
