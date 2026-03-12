@@ -21,6 +21,7 @@
 /build
 /dist
 /.react-router
+/.svelte-kit
 
 # misc
 .DS_Store

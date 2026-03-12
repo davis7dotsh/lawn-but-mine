@@ -1,5 +1,3 @@
-"use client";
-
 /**
  * Trigger a browser download for a presigned URL.
  * Falls back to opening a new tab if the download attribute is ignored.
