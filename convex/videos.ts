@@ -1,7 +1,8 @@
 import { v } from "convex/values";
-import { internalMutation, internalQuery, mutation, query, MutationCtx } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { identityName, requireProjectAccess, requireVideoAccess } from "./auth";
-import { Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 import { generateUniqueToken } from "./security";
 import { resolveActiveShareGrant } from "./shareAccess";
 import { assertTeamCanStoreBytes } from "./billingHelpers";

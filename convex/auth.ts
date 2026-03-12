@@ -1,5 +1,5 @@
-import { QueryCtx, MutationCtx, ActionCtx } from "./_generated/server";
-import { Id } from "./_generated/dataModel";
+import type { QueryCtx, MutationCtx, ActionCtx } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
 
 type ClerkIdentity = NonNullable<
   Awaited<ReturnType<QueryCtx["auth"]["getUserIdentity"]>>

@@ -1,57 +1,57 @@
-<script lang="ts">// pragma: allowlist secret
-  import { Upload } from "lucide-svelte"; // pragma: allowlist secret
+<script lang="ts">
+  import { Upload } from "lucide-svelte"; 
 
-  let { // pragma: allowlist secret
-    onFilesSelected, // pragma: allowlist secret
-    disabled = false, // pragma: allowlist secret
-    class: className = "", // pragma: allowlist secret
-  }: { // pragma: allowlist secret
-    onFilesSelected: (files: File[]) => void; // pragma: allowlist secret
-    disabled?: boolean; // pragma: allowlist secret
-    class?: string; // pragma: allowlist secret
-  } = $props(); // pragma: allowlist secret
+  let { 
+    onFilesSelected, 
+    disabled = false, 
+    class: className = "", 
+  }: { 
+    onFilesSelected: (files: File[]) => void; 
+    disabled?: boolean; 
+    class?: string; 
+  } = $props(); 
 
-  const VIDEO_FILE_EXTENSIONS = /\.(mp4|mov|m4v|webm|avi|mkv)$/i; // pragma: allowlist secret
+  const VIDEO_FILE_EXTENSIONS = /\.(mp4|mov|m4v|webm|avi|mkv)$/i; 
 
-  let isDragActive = $state(false); // pragma: allowlist secret
+  let isDragActive = $state(false); 
 
-  const getVideoFiles = (list: FileList | null) => // pragma: allowlist secret
-    Array.from(list ?? []).filter( // pragma: allowlist secret
-      (file) => file.type.startsWith("video/") || VIDEO_FILE_EXTENSIONS.test(file.name), // pragma: allowlist secret
-    ); // pragma: allowlist secret
+  const getVideoFiles = (list: FileList | null) => 
+    Array.from(list ?? []).filter( 
+      (file) => file.type.startsWith("video/") || VIDEO_FILE_EXTENSIONS.test(file.name), 
+    ); 
 
-  const handleDrag = (event: DragEvent) => { // pragma: allowlist secret
-    event.preventDefault(); // pragma: allowlist secret
-    event.stopPropagation(); // pragma: allowlist secret
-    if (event.type === "dragenter" || event.type === "dragover") { // pragma: allowlist secret
-      isDragActive = true; // pragma: allowlist secret
-      return; // pragma: allowlist secret
-    } // pragma: allowlist secret
-    if (event.type === "dragleave") { // pragma: allowlist secret
-      isDragActive = false; // pragma: allowlist secret
-    } // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleDrag = (event: DragEvent) => { 
+    event.preventDefault(); 
+    event.stopPropagation(); 
+    if (event.type === "dragenter" || event.type === "dragover") { 
+      isDragActive = true; 
+      return; 
+    } 
+    if (event.type === "dragleave") { 
+      isDragActive = false; 
+    } 
+  }; 
 
-  const handleDrop = (event: DragEvent) => { // pragma: allowlist secret
-    event.preventDefault(); // pragma: allowlist secret
-    event.stopPropagation(); // pragma: allowlist secret
-    isDragActive = false; // pragma: allowlist secret
-    if (disabled) return; // pragma: allowlist secret
+  const handleDrop = (event: DragEvent) => { 
+    event.preventDefault(); 
+    event.stopPropagation(); 
+    isDragActive = false; 
+    if (disabled) return; 
 
-    const files = getVideoFiles(event.dataTransfer?.files ?? null); // pragma: allowlist secret
-    if (files.length > 0) { // pragma: allowlist secret
-      onFilesSelected(files); // pragma: allowlist secret
-    } // pragma: allowlist secret
-  }; // pragma: allowlist secret
+    const files = getVideoFiles(event.dataTransfer?.files ?? null); 
+    if (files.length > 0) { 
+      onFilesSelected(files); 
+    } 
+  }; 
 
-  const handleChange = (event: Event) => { // pragma: allowlist secret
-    if (disabled) return; // pragma: allowlist secret
-    const files = getVideoFiles((event.currentTarget as HTMLInputElement).files); // pragma: allowlist secret
-    if (files.length > 0) { // pragma: allowlist secret
-      onFilesSelected(files); // pragma: allowlist secret
-    } // pragma: allowlist secret
-    (event.currentTarget as HTMLInputElement).value = ""; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleChange = (event: Event) => { 
+    if (disabled) return; 
+    const files = getVideoFiles((event.currentTarget as HTMLInputElement).files); 
+    if (files.length > 0) { 
+      onFilesSelected(files); 
+    } 
+    (event.currentTarget as HTMLInputElement).value = ""; 
+  }; 
 </script>
 
 <div

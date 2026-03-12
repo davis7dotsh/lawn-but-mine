@@ -1,5 +1,5 @@
 import { Autumn, type Customer, type CustomerProduct } from "autumn-js";
-import { Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 import {
   TEAM_PLAN_IDS,
   hasActiveBillingStatus,

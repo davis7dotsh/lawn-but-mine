@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 import { action, internalMutation, query, type ActionCtx } from "./_generated/server";
 import { getIdentity, requireTeamAccess } from "./auth";
 import {

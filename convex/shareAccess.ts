@@ -1,5 +1,5 @@
-import { Doc, Id } from "./_generated/dataModel";
-import { MutationCtx, QueryCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { generateUniqueToken } from "./security";
 
 type ReadCtx = QueryCtx | MutationCtx;

@@ -1,5 +1,5 @@
-<script lang="ts">// pragma: allowlist secret
-  import { browser } from "$app/environment"; // pragma: allowlist secret
+<script lang="ts">
+  import { browser } from "$app/environment"; 
   import { useQuery } from "convex-svelte";
   import { api } from "@convex/_generated/api";
   import type { Id } from "@convex/_generated/dataModel";

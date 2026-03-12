@@ -1,8 +1,9 @@
 import { MINUTE, RateLimiter } from "@convex-dev/rate-limiter";
 import { v } from "convex/values";
 import { components } from "./_generated/api";
-import { Doc, Id } from "./_generated/dataModel";
-import { mutation, query, MutationCtx } from "./_generated/server";
+import type { Doc, Id } from "./_generated/dataModel";
+import { mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { identityName, requireVideoAccess } from "./auth";
 import { generateUniqueToken, hashPassword, verifyPassword } from "./security";
 import { findShareLinkByToken, issueShareAccessGrant } from "./shareAccess";

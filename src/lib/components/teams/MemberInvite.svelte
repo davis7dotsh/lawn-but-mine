@@ -1,80 +1,80 @@
-<script lang="ts">// pragma: allowlist secret
-  import { api } from "@convex/_generated/api"; // pragma: allowlist secret
-  import type { Id } from "@convex/_generated/dataModel"; // pragma: allowlist secret
-  import { useConvexClient, useQuery } from "convex-svelte"; // pragma: allowlist secret
-  import { Check, Copy, Trash2, UserPlus, X } from "lucide-svelte"; // pragma: allowlist secret
-  import { getInitials } from "@/lib/utils"; // pragma: allowlist secret
+<script lang="ts">
+  import { api } from "@convex/_generated/api"; 
+  import type { Id } from "@convex/_generated/dataModel"; 
+  import { useConvexClient, useQuery } from "convex-svelte"; 
+  import { Check, Copy, Trash2, UserPlus, X } from "lucide-svelte"; 
+  import { getInitials } from "@/lib/utils"; 
 
-  type Role = "admin" | "member" | "viewer"; // pragma: allowlist secret
+  type Role = "admin" | "member" | "viewer"; 
 
-  const roleLabels: Record<Role, string> = { // pragma: allowlist secret
-    admin: "Admin", // pragma: allowlist secret
-    member: "Member", // pragma: allowlist secret
-    viewer: "Viewer", // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const roleLabels: Record<Role, string> = { 
+    admin: "Admin", 
+    member: "Member", 
+    viewer: "Viewer", 
+  }; 
 
-  let { // pragma: allowlist secret
-    teamId, // pragma: allowlist secret
-    open, // pragma: allowlist secret
-    onOpenChange, // pragma: allowlist secret
-  }: { // pragma: allowlist secret
-    teamId: Id<"teams">; // pragma: allowlist secret
-    open: boolean; // pragma: allowlist secret
-    onOpenChange: (open: boolean) => void; // pragma: allowlist secret
-  } = $props(); // pragma: allowlist secret
+  let { 
+    teamId, 
+    open, 
+    onOpenChange, 
+  }: { 
+    teamId: Id<"teams">; 
+    open: boolean; 
+    onOpenChange: (open: boolean) => void; 
+  } = $props(); 
 
-  const convex = useConvexClient(); // pragma: allowlist secret
-  const membersQuery = useQuery(api.teams.getMembers, () => (open ? { teamId } : "skip")); // pragma: allowlist secret
-  const invitesQuery = useQuery(api.teams.getInvites, () => (open ? { teamId } : "skip")); // pragma: allowlist secret
+  const convex = useConvexClient(); 
+  const membersQuery = useQuery(api.teams.getMembers, () => (open ? { teamId } : "skip")); 
+  const invitesQuery = useQuery(api.teams.getInvites, () => (open ? { teamId } : "skip")); 
 
-  let email = $state(""); // pragma: allowlist secret
-  let role = $state<Role>("member"); // pragma: allowlist secret
-  let isLoading = $state(false); // pragma: allowlist secret
-  let inviteLink = $state<string | null>(null); // pragma: allowlist secret
-  let copied = $state(false); // pragma: allowlist secret
+  let email = $state(""); 
+  let role = $state<Role>("member"); 
+  let isLoading = $state(false); 
+  let inviteLink = $state<string | null>(null); 
+  let copied = $state(false); 
 
-  const handleInvite = async (event: SubmitEvent) => { // pragma: allowlist secret
-    event.preventDefault(); // pragma: allowlist secret
-    if (!email.trim()) return; // pragma: allowlist secret
+  const handleInvite = async (event: SubmitEvent) => { 
+    event.preventDefault(); 
+    if (!email.trim()) return; 
 
-    isLoading = true; // pragma: allowlist secret
-    try { // pragma: allowlist secret
-      const token = await convex.mutation(api.teams.inviteMember, { // pragma: allowlist secret
-        teamId, // pragma: allowlist secret
-        email: email.trim(), // pragma: allowlist secret
-        role, // pragma: allowlist secret
-      }); // pragma: allowlist secret
-      const baseUrl = typeof window !== "undefined" ? window.location.origin : ""; // pragma: allowlist secret
-      inviteLink = `${baseUrl}/invite/${token}`; // pragma: allowlist secret
-      email = ""; // pragma: allowlist secret
-    } finally { // pragma: allowlist secret
-      isLoading = false; // pragma: allowlist secret
-    } // pragma: allowlist secret
-  }; // pragma: allowlist secret
+    isLoading = true; 
+    try { 
+      const token = await convex.mutation(api.teams.inviteMember, { 
+        teamId, 
+        email: email.trim(), 
+        role, 
+      }); 
+      const baseUrl = typeof window !== "undefined" ? window.location.origin : ""; 
+      inviteLink = `${baseUrl}/invite/${token}`; 
+      email = ""; 
+    } finally { 
+      isLoading = false; 
+    } 
+  }; 
 
-  const handleCopyLink = async () => { // pragma: allowlist secret
-    if (!inviteLink) return; // pragma: allowlist secret
-    await navigator.clipboard.writeText(inviteLink); // pragma: allowlist secret
-    copied = true; // pragma: allowlist secret
-    setTimeout(() => { // pragma: allowlist secret
-      copied = false; // pragma: allowlist secret
-    }, 2000); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleCopyLink = async () => { 
+    if (!inviteLink) return; 
+    await navigator.clipboard.writeText(inviteLink); 
+    copied = true; 
+    setTimeout(() => { 
+      copied = false; 
+    }, 2000); 
+  }; 
 
-  const handleRemoveMember = async (membershipId: Id<"teamMembers">) => { // pragma: allowlist secret
-    await convex.mutation(api.teams.removeMember, { // pragma: allowlist secret
-      teamId, // pragma: allowlist secret
-      membershipId, // pragma: allowlist secret
-    }); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleRemoveMember = async (membershipId: Id<"teamMembers">) => { 
+    await convex.mutation(api.teams.removeMember, { 
+      teamId, 
+      membershipId, 
+    }); 
+  }; 
 
-  const handleUpdateRole = async (membershipId: Id<"teamMembers">, nextRole: Role) => { // pragma: allowlist secret
-    await convex.mutation(api.teams.updateMemberRole, { // pragma: allowlist secret
-      teamId, // pragma: allowlist secret
-      membershipId, // pragma: allowlist secret
-      role: nextRole, // pragma: allowlist secret
-    }); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleUpdateRole = async (membershipId: Id<"teamMembers">, nextRole: Role) => { 
+    await convex.mutation(api.teams.updateMemberRole, { 
+      teamId, 
+      membershipId, 
+      role: nextRole, 
+    }); 
+  }; 
 </script>
 
 {#if open}

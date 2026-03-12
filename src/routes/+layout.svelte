@@ -5,17 +5,18 @@
 
   import { browser } from "$app/environment";
   import { onMount } from "svelte";
-  import { setupConvex } from "convex-svelte";
+  import { setConvexClientContext } from "convex-svelte";
 
   import { initClerk } from "@/lib/auth/clerk.svelte";
   import { initTheme, themeInitScript } from "@/lib/theme.svelte";
+  import { getSharedConvexClient } from "@/lib/useVideoPresence";
 
   let { children }: { children?: Snippet } = $props();
 
-  const convexUrl = import.meta.env.VITE_CONVEX_URL as string | undefined;
+  const convexClient = browser ? getSharedConvexClient() : null;
 
-  if (browser && convexUrl) {
-    setupConvex(convexUrl);
+  if (convexClient) {
+    setConvexClientContext(convexClient);
   }
 
   onMount(() => {
@@ -39,7 +40,7 @@
   <link rel="preconnect" href="https://image.mux.com" crossorigin="anonymous" />
   <link rel="dns-prefetch" href="//stream.mux.com" />
   <link rel="dns-prefetch" href="//image.mux.com" />
-  <script>{themeInitScript}</script>
+  {@html `<script>${themeInitScript}<\/script>`}
 </svelte:head>
 
 {#if children}

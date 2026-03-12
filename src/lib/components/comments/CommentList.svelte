@@ -1,5 +1,5 @@
-<script lang="ts">// pragma: allowlist secret
-  import CommentItem from "./CommentItem.svelte"; // pragma: allowlist secret
+<script lang="ts">
+  import CommentItem from "./CommentItem.svelte"; 
 
   export type ThreadedComment = {
     _id: string;

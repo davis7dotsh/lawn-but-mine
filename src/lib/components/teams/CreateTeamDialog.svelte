@@ -1,44 +1,44 @@
-<script lang="ts">// pragma: allowlist secret
-  import { goto } from "$app/navigation"; // pragma: allowlist secret
-  import { api } from "@convex/_generated/api"; // pragma: allowlist secret
-  import { useConvexClient } from "convex-svelte"; // pragma: allowlist secret
-  import { Plus, X } from "lucide-svelte"; // pragma: allowlist secret
-  import { teamHomePath } from "@/lib/routes"; // pragma: allowlist secret
+<script lang="ts">
+  import { goto } from "$app/navigation"; 
+  import { api } from "@convex/_generated/api"; 
+  import { useConvexClient } from "convex-svelte"; 
+  import { Plus, X } from "lucide-svelte"; 
+  import { teamHomePath } from "@/lib/routes"; 
 
-  let { // pragma: allowlist secret
-    open, // pragma: allowlist secret
-    onOpenChange, // pragma: allowlist secret
-  }: { // pragma: allowlist secret
-    open: boolean; // pragma: allowlist secret
-    onOpenChange: (open: boolean) => void; // pragma: allowlist secret
-  } = $props(); // pragma: allowlist secret
+  let { 
+    open, 
+    onOpenChange, 
+  }: { 
+    open: boolean; 
+    onOpenChange: (open: boolean) => void; 
+  } = $props(); 
 
-  const convex = useConvexClient(); // pragma: allowlist secret
-  let name = $state(""); // pragma: allowlist secret
-  let isLoading = $state(false); // pragma: allowlist secret
-  let input: HTMLInputElement | null = null; // pragma: allowlist secret
+  const convex = useConvexClient(); 
+  let name = $state(""); 
+  let isLoading = $state(false); 
+  let input: HTMLInputElement | null = null; 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!open || !input) return; // pragma: allowlist secret
-    queueMicrotask(() => input?.focus()); // pragma: allowlist secret
-  }); // pragma: allowlist secret
+  $effect(() => { 
+    if (!open || !input) return; 
+    queueMicrotask(() => input?.focus()); 
+  }); 
 
-  const handleSubmit = async (event: SubmitEvent) => { // pragma: allowlist secret
-    event.preventDefault(); // pragma: allowlist secret
-    if (!name.trim()) return; // pragma: allowlist secret
+  const handleSubmit = async (event: SubmitEvent) => { 
+    event.preventDefault(); 
+    if (!name.trim()) return; 
 
-    isLoading = true; // pragma: allowlist secret
-    try { // pragma: allowlist secret
-      const createdTeam = await convex.mutation(api.teams.create, { // pragma: allowlist secret
-        name: name.trim(), // pragma: allowlist secret
-      }); // pragma: allowlist secret
-      name = ""; // pragma: allowlist secret
-      onOpenChange(false); // pragma: allowlist secret
-      await goto(teamHomePath(createdTeam.slug)); // pragma: allowlist secret
-    } finally { // pragma: allowlist secret
-      isLoading = false; // pragma: allowlist secret
-    } // pragma: allowlist secret
-  }; // pragma: allowlist secret
+    isLoading = true; 
+    try { 
+      const createdTeam = await convex.mutation(api.teams.create, { 
+        name: name.trim(), 
+      }); 
+      name = ""; 
+      onOpenChange(false); 
+      await goto(teamHomePath(createdTeam.slug)); 
+    } finally { 
+      isLoading = false; 
+    } 
+  }; 
 </script>
 
 {#if open}

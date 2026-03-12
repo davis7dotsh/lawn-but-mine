@@ -1,36 +1,36 @@
-<script lang="ts">// pragma: allowlist secret
-  import { AlertCircle, CheckCircle, Loader2, X } from "lucide-svelte"; // pragma: allowlist secret
-  import { formatBytes } from "@/lib/utils"; // pragma: allowlist secret
-  import type { UploadStatus } from "@/lib/dashboardUploadContext.svelte"; // pragma: allowlist secret
+<script lang="ts">
+  import { AlertCircle, CheckCircle, Loader2, X } from "lucide-svelte"; 
+  import { formatBytes } from "@/lib/utils"; 
+  import type { UploadStatus } from "@/lib/dashboardUploadContext.svelte"; 
 
-  let { // pragma: allowlist secret
-    fileName, // pragma: allowlist secret
-    fileSize, // pragma: allowlist secret
-    progress, // pragma: allowlist secret
-    status, // pragma: allowlist secret
-    error, // pragma: allowlist secret
-    bytesPerSecond = 0, // pragma: allowlist secret
-    estimatedSecondsRemaining = null, // pragma: allowlist secret
-    onCancel, // pragma: allowlist secret
-  }: { // pragma: allowlist secret
-    fileName: string; // pragma: allowlist secret
-    fileSize: number; // pragma: allowlist secret
-    progress: number; // pragma: allowlist secret
-    status: UploadStatus; // pragma: allowlist secret
-    error?: string; // pragma: allowlist secret
-    bytesPerSecond?: number; // pragma: allowlist secret
-    estimatedSecondsRemaining?: number | null; // pragma: allowlist secret
-    onCancel?: () => void; // pragma: allowlist secret
-  } = $props(); // pragma: allowlist secret
+  let { 
+    fileName, 
+    fileSize, 
+    progress, 
+    status, 
+    error, 
+    bytesPerSecond = 0, 
+    estimatedSecondsRemaining = null, 
+    onCancel, 
+  }: { 
+    fileName: string; 
+    fileSize: number; 
+    progress: number; 
+    status: UploadStatus; 
+    error?: string; 
+    bytesPerSecond?: number; 
+    estimatedSecondsRemaining?: number | null; 
+    onCancel?: () => void; 
+  } = $props(); 
 
-  const formatSpeed = (value: number) => (value === 0 ? "—" : `${formatBytes(value)}/s`); // pragma: allowlist secret
+  const formatSpeed = (value: number) => (value === 0 ? "—" : `${formatBytes(value)}/s`); 
 
-  const formatTimeRemaining = (seconds: number | null) => { // pragma: allowlist secret
-    if (seconds === null || seconds <= 0) return ""; // pragma: allowlist secret
-    if (seconds < 60) return `${seconds}s`; // pragma: allowlist secret
-    if (seconds < 3600) return `${Math.ceil(seconds / 60)}m`; // pragma: allowlist secret
-    return `${Math.ceil(seconds / 3600)}h`; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const formatTimeRemaining = (seconds: number | null) => { 
+    if (seconds === null || seconds <= 0) return ""; 
+    if (seconds < 60) return `${seconds}s`; 
+    if (seconds < 3600) return `${Math.ceil(seconds / 60)}m`; 
+    return `${Math.ceil(seconds / 3600)}h`; 
+  }; 
 </script>
 
 <div class="border-2 border-[#1a1a1a] p-4 bg-[#f0f0e8]">

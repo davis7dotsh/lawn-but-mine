@@ -1,5 +1,5 @@
-<script lang="ts">// pragma: allowlist secret
-  import { goto } from "$app/navigation"; // pragma: allowlist secret
+<script lang="ts">
+  import { goto } from "$app/navigation"; 
   import { page } from "$app/state";
   import { setConvexClientContext, useQuery } from "convex-svelte";
   import { AlertCircle, Check, Mail, Users } from "lucide-svelte";

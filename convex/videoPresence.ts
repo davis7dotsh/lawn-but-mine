@@ -1,7 +1,8 @@
 import { Presence } from "@convex-dev/presence";
 import { ConvexError, v } from "convex/values";
 import { components } from "./_generated/api";
-import { mutation, query, MutationCtx } from "./_generated/server";
+import { mutation, query } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import {
   identityAvatarUrl,
   identityName,

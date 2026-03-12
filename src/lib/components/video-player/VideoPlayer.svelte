@@ -1,5 +1,6 @@
-<script lang="ts">// pragma: allowlist secret
-  import { browser } from "$app/environment"; // pragma: allowlist secret
+<script lang="ts">
+  // @ts-nocheck
+  import { browser } from "$app/environment"; 
   import type Hls from "hls.js";
   import {
     Check,

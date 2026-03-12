@@ -1,5 +1,5 @@
-<script lang="ts">// pragma: allowlist secret
-  import { Clock, MessageSquare } from "lucide-svelte"; // pragma: allowlist secret
+<script lang="ts">
+  import { Clock, MessageSquare } from "lucide-svelte"; 
   import { formatTimestamp } from "@/lib/utils";
 
   let {

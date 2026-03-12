@@ -1,115 +1,115 @@
-<script lang="ts">// pragma: allowlist secret
-  import { goto } from "$app/navigation"; // pragma: allowlist secret
-  import { browser } from "$app/environment"; // pragma: allowlist secret
-  import { page } from "$app/state"; // pragma: allowlist secret
-  import { api } from "@convex/_generated/api"; // pragma: allowlist secret
-  import type { Id } from "@convex/_generated/dataModel"; // pragma: allowlist secret
-  import { useConvexClient, useQuery } from "convex-svelte"; // pragma: allowlist secret
-  import { ArrowRight, CreditCard, Folder, Plus, Trash2, Users, X } from "lucide-svelte"; // pragma: allowlist secret
-  import DashboardHeader from "@/lib/components/DashboardHeader.svelte"; // pragma: allowlist secret
-  import MemberInvite from "@/lib/components/teams/MemberInvite.svelte"; // pragma: allowlist secret
-  import { makeRouteQuerySpec, prewarmIntent, prewarmSpecs } from "@/lib/convex/prewarm"; // pragma: allowlist secret
-  import { projectPath, teamSettingsPath } from "@/lib/routes"; // pragma: allowlist secret
-  import { shouldRefreshBilling } from "@/shared/billingPlans"; // pragma: allowlist secret
+<script lang="ts">
+  import { goto } from "$app/navigation"; 
+  import { browser } from "$app/environment"; 
+  import { page } from "$app/state"; 
+  import { api } from "@convex/_generated/api"; 
+  import type { Id } from "@convex/_generated/dataModel"; 
+  import { useConvexClient, useQuery } from "convex-svelte"; 
+  import { ArrowRight, CreditCard, Folder, Plus, Trash2, Users, X } from "lucide-svelte"; 
+  import DashboardHeader from "@/lib/components/DashboardHeader.svelte"; 
+  import MemberInvite from "@/lib/components/teams/MemberInvite.svelte"; 
+  import { makeRouteQuerySpec, prewarmIntent, prewarmSpecs } from "@/lib/convex/prewarm"; 
+  import { projectPath, teamSettingsPath } from "@/lib/routes"; 
+  import { shouldRefreshBilling } from "@/shared/billingPlans"; 
 
-  const convex = useConvexClient(); // pragma: allowlist secret
+  const convex = useConvexClient(); 
 
-  let createDialogOpen = $state(false); // pragma: allowlist secret
-  let memberDialogOpen = $state(false); // pragma: allowlist secret
-  let newProjectName = $state(""); // pragma: allowlist secret
-  let isLoading = $state(false); // pragma: allowlist secret
+  let createDialogOpen = $state(false); 
+  let memberDialogOpen = $state(false); 
+  let newProjectName = $state(""); 
+  let isLoading = $state(false); 
 
-  const teamSlug = $derived(page.params.teamSlug); // pragma: allowlist secret
-  const pathname = $derived(page.url.pathname); // pragma: allowlist secret
+  const teamSlug = $derived(page.params.teamSlug); 
+  const pathname = $derived(page.url.pathname); 
 
-  const contextQuery = useQuery(api.workspace.resolveContext, () => ({ // pragma: allowlist secret
-    teamSlug, // pragma: allowlist secret
-  })); // pragma: allowlist secret
+  const contextQuery = useQuery(api.workspace.resolveContext, () => ({ 
+    teamSlug, 
+  })); 
 
-  const team = $derived(contextQuery.data?.team); // pragma: allowlist secret
-  const projectsQuery = useQuery(api.projects.list, () => // pragma: allowlist secret
-    team ? { teamId: team._id } : "skip", // pragma: allowlist secret
-  ); // pragma: allowlist secret
-  const billingQuery = useQuery(api.billing.getTeamBilling, () => // pragma: allowlist secret
-    team ? { teamId: team._id } : "skip", // pragma: allowlist secret
-  ); // pragma: allowlist secret
+  const team = $derived(contextQuery.data?.team); 
+  const projectsQuery = useQuery(api.projects.list, () => 
+    team ? { teamId: team._id } : "skip", 
+  ); 
+  const billingQuery = useQuery(api.billing.getTeamBilling, () => 
+    team ? { teamId: team._id } : "skip", 
+  ); 
 
-  const shouldCanonicalize = $derived( // pragma: allowlist secret
-    Boolean(contextQuery.data && !contextQuery.data.isCanonical && pathname !== contextQuery.data.canonicalPath), // pragma: allowlist secret
-  ); // pragma: allowlist secret
+  const shouldCanonicalize = $derived( 
+    Boolean(contextQuery.data && !contextQuery.data.isCanonical && pathname !== contextQuery.data.canonicalPath), 
+  ); 
 
-  const prewarmProject = (nextTeamSlug: string, projectId: Id<"projects">) => // pragma: allowlist secret
-    prewarmSpecs(convex, [ // pragma: allowlist secret
-      makeRouteQuerySpec(api.workspace.resolveContext, { // pragma: allowlist secret
-        teamSlug: nextTeamSlug, // pragma: allowlist secret
-        projectId, // pragma: allowlist secret
-      }), // pragma: allowlist secret
-      makeRouteQuerySpec(api.projects.get, { // pragma: allowlist secret
-        projectId, // pragma: allowlist secret
-      }), // pragma: allowlist secret
-      makeRouteQuerySpec(api.videos.list, { // pragma: allowlist secret
-        projectId, // pragma: allowlist secret
-      }), // pragma: allowlist secret
-    ]); // pragma: allowlist secret
+  const prewarmProject = (nextTeamSlug: string, projectId: Id<"projects">) => 
+    prewarmSpecs(convex, [ 
+      makeRouteQuerySpec(api.workspace.resolveContext, { 
+        teamSlug: nextTeamSlug, 
+        projectId, 
+      }), 
+      makeRouteQuerySpec(api.projects.get, { 
+        projectId, 
+      }), 
+      makeRouteQuerySpec(api.videos.list, { 
+        projectId, 
+      }), 
+    ]); 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!browser || !shouldCanonicalize || !contextQuery.data) return; // pragma: allowlist secret
-    void goto(contextQuery.data.canonicalPath, { // pragma: allowlist secret
-      replaceState: true, // pragma: allowlist secret
-      noScroll: true, // pragma: allowlist secret
-    }); // pragma: allowlist secret
-  }); // pragma: allowlist secret
+  $effect(() => { 
+    if (!browser || !shouldCanonicalize || !contextQuery.data) return; 
+    void goto(contextQuery.data.canonicalPath, { 
+      replaceState: true, 
+      noScroll: true, 
+    }); 
+  }); 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!team || billingQuery.data === undefined) return; // pragma: allowlist secret
+  $effect(() => { 
+    if (!team || billingQuery.data === undefined) return; 
 
-    const forceRefresh = // pragma: allowlist secret
-      page.url.searchParams.has("billing") && // pragma: allowlist secret
-      ["success", "cancel"].includes(page.url.searchParams.get("billing") || ""); // pragma: allowlist secret
+    const forceRefresh = 
+      page.url.searchParams.has("billing") && 
+      ["success", "cancel"].includes(page.url.searchParams.get("billing") || ""); 
 
-    if (!shouldRefreshBilling(billingQuery.data?.billingLastSyncedAt, forceRefresh)) { // pragma: allowlist secret
-      return; // pragma: allowlist secret
-    } // pragma: allowlist secret
+    if (!shouldRefreshBilling(billingQuery.data?.billingLastSyncedAt, forceRefresh)) { 
+      return; 
+    } 
 
-    void convex.action(api.billing.refreshTeamBilling, { // pragma: allowlist secret
-      teamId: team._id, // pragma: allowlist secret
-    }).catch(() => undefined); // pragma: allowlist secret
-  }); // pragma: allowlist secret
+    void convex.action(api.billing.refreshTeamBilling, { 
+      teamId: team._id, 
+    }).catch(() => undefined); 
+  }); 
 
-  const handleCreateProject = async (event: SubmitEvent) => { // pragma: allowlist secret
-    event.preventDefault(); // pragma: allowlist secret
-    if (!newProjectName.trim() || !team) return; // pragma: allowlist secret
+  const handleCreateProject = async (event: SubmitEvent) => { 
+    event.preventDefault(); 
+    if (!newProjectName.trim() || !team) return; 
 
-    isLoading = true; // pragma: allowlist secret
-    try { // pragma: allowlist secret
-      const projectId = await convex.mutation(api.projects.create, { // pragma: allowlist secret
-        teamId: team._id, // pragma: allowlist secret
-        name: newProjectName.trim(), // pragma: allowlist secret
-      }); // pragma: allowlist secret
-      createDialogOpen = false; // pragma: allowlist secret
-      newProjectName = ""; // pragma: allowlist secret
-      await goto(projectPath(team.slug, projectId)); // pragma: allowlist secret
-    } finally { // pragma: allowlist secret
-      isLoading = false; // pragma: allowlist secret
-    } // pragma: allowlist secret
-  }; // pragma: allowlist secret
+    isLoading = true; 
+    try { 
+      const projectId = await convex.mutation(api.projects.create, { 
+        teamId: team._id, 
+        name: newProjectName.trim(), 
+      }); 
+      createDialogOpen = false; 
+      newProjectName = ""; 
+      await goto(projectPath(team.slug, projectId)); 
+    } finally { 
+      isLoading = false; 
+    } 
+  }; 
 
-  const handleDeleteProject = async (projectId: Id<"projects">) => { // pragma: allowlist secret
-    if (!window.confirm("Are you sure you want to delete this project?")) return; // pragma: allowlist secret
-    await convex.mutation(api.projects.remove, { projectId }); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleDeleteProject = async (projectId: Id<"projects">) => { 
+    if (!window.confirm("Are you sure you want to delete this project?")) return; 
+    await convex.mutation(api.projects.remove, { projectId }); 
+  }; 
 
-  const isLoadingData = $derived( // pragma: allowlist secret
-    contextQuery.data === undefined || // pragma: allowlist secret
-      billingQuery.data === undefined || // pragma: allowlist secret
-      projectsQuery.data === undefined || // pragma: allowlist secret
-      shouldCanonicalize, // pragma: allowlist secret
-  ); // pragma: allowlist secret
-  const canManageMembers = $derived(team?.role === "owner" || team?.role === "admin"); // pragma: allowlist secret
-  const hasActiveSubscription = $derived(billingQuery.data?.hasActiveSubscription ?? false); // pragma: allowlist secret
-  const canCreateProject = $derived(team?.role !== "viewer" && hasActiveSubscription); // pragma: allowlist secret
-  const canAccessBilling = $derived(team?.role === "owner"); // pragma: allowlist secret
-  const billingPath = $derived(team ? teamSettingsPath(team.slug) : null); // pragma: allowlist secret
+  const isLoadingData = $derived( 
+    contextQuery.data === undefined || 
+      billingQuery.data === undefined || 
+      projectsQuery.data === undefined || 
+      shouldCanonicalize, 
+  ); 
+  const canManageMembers = $derived(team?.role === "owner" || team?.role === "admin"); 
+  const hasActiveSubscription = $derived(billingQuery.data?.hasActiveSubscription ?? false); 
+  const canCreateProject = $derived(team?.role !== "viewer" && hasActiveSubscription); 
+  const canAccessBilling = $derived(team?.role === "owner"); 
+  const billingPath = $derived(team ? teamSettingsPath(team.slug) : null); 
 </script>
 
 {#if contextQuery.data === null}

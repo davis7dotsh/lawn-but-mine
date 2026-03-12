@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { getUser } from "./auth";
-import { Doc } from "./_generated/dataModel";
+import type { Doc } from "./_generated/dataModel";
 
 function buildCanonicalPath(input: {
   teamSlug: string;

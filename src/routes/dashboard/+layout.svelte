@@ -1,250 +1,169 @@
-<script lang="ts">// pragma: allowlist secret
-  import { browser } from "$app/environment"; // pragma: allowlist secret
-  import { page } from "$app/state"; // pragma: allowlist secret
-  import { ConvexClient } from "convex/browser"; // pragma: allowlist secret
-  import { setConvexClientContext, useQuery } from "convex-svelte"; // pragma: allowlist secret
-  import { api } from "@convex/_generated/api"; // pragma: allowlist secret
-  import type { Id } from "@convex/_generated/dataModel"; // pragma: allowlist secret
-  import { setDashboardUploadContext } from "@/lib/dashboardUploadContext.svelte"; // pragma: allowlist secret
-  import { useVideoUploadManager } from "@/lib/components/upload/useVideoUploadManager.svelte"; // pragma: allowlist secret
-  import UploadProgress from "@/lib/components/upload/UploadProgress.svelte"; // pragma: allowlist secret
+<script lang="ts">
+  import { browser } from "$app/environment";
+  import { page } from "$app/state";
+  import { setConvexClientContext, useQuery } from "convex-svelte";
+  import { api } from "@convex/_generated/api";
+  import type { Id } from "@convex/_generated/dataModel";
 
-  type ClerkLike = { // pragma: allowlist secret
-    loaded?: boolean; // pragma: allowlist secret
-    user?: { id?: string } | null; // pragma: allowlist secret
-    session?: { // pragma: allowlist secret
-      getToken?: (options?: { // pragma: allowlist secret
-        template?: string; // pragma: allowlist secret
-        skipCache?: boolean; // pragma: allowlist secret
-      }) => Promise<string | null>; // pragma: allowlist secret
-    } | null; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  import { setDashboardUploadContext } from "@/lib/dashboardUploadContext.svelte";
+  import { useVideoUploadManager } from "@/lib/components/upload/useVideoUploadManager.svelte";
+  import UploadProgress from "@/lib/components/upload/UploadProgress.svelte";
+  import { clerkAuth, getSharedConvexClient } from "@/lib/useVideoPresence";
 
-  const convexUrl = import.meta.env.VITE_CONVEX_URL; // pragma: allowlist secret
+  const auth = clerkAuth;
+  const convex = getSharedConvexClient();
+  setConvexClientContext(convex);
 
-  if (!convexUrl) { // pragma: allowlist secret
-    throw new Error("Missing VITE_CONVEX_URL"); // pragma: allowlist secret
-  } // pragma: allowlist secret
+  let isGlobalDragActive = $state(false);
+  let projectPickerOpen = $state(false);
+  let pendingFiles = $state<File[] | null>(null);
+  let dragDepth = $state(0);
 
-  const convex = new ConvexClient(convexUrl, { // pragma: allowlist secret
-    disabled: !browser, // pragma: allowlist secret
-  }); // pragma: allowlist secret
+  const uploadManager = useVideoUploadManager();
 
-  setConvexClientContext(convex); // pragma: allowlist secret
+  const teamSlug = $derived(page.params.teamSlug || undefined);
+  const routeProjectId = $derived(
+    page.params.projectId ? (page.params.projectId as Id<"projects">) : undefined,
+  );
+  const routeVideoId = $derived(
+    page.params.videoId ? (page.params.videoId as Id<"videos">) : undefined,
+  );
+  const pathname = $derived(page.url.pathname);
+  const search = $derived(page.url.search);
+  const isLoaded = $derived($auth.isLoaded);
+  const userId = $derived($auth.user?.id ?? null);
 
-  let isLoaded = $state(!browser); // pragma: allowlist secret
-  let userId = $state<string | null>(null); // pragma: allowlist secret
-  let isGlobalDragActive = $state(false); // pragma: allowlist secret
-  let projectPickerOpen = $state(false); // pragma: allowlist secret
-  let pendingFiles = $state<File[] | null>(null); // pragma: allowlist secret
-  let dragDepth = $state(0); // pragma: allowlist secret
+  const publicPlaybackIdQuery = useQuery(
+    api.videos.getPublicIdByVideoId,
+    () => (routeVideoId ? { videoId: routeVideoId } : "skip"),
+  );
 
-  const uploadManager = useVideoUploadManager(); // pragma: allowlist secret
+  const uploadTargetsQuery = useQuery(
+    api.projects.listUploadTargets,
+    () => {
+      if (!isLoaded || !userId) return "skip";
+      return teamSlug ? { teamSlug } : {};
+    },
+  );
 
-  const teamSlug = $derived(page.params.teamSlug || undefined); // pragma: allowlist secret
-  const routeProjectId = $derived( // pragma: allowlist secret
-    page.params.projectId ? (page.params.projectId as Id<"projects">) : undefined, // pragma: allowlist secret
-  ); // pragma: allowlist secret
-  const routeVideoId = $derived( // pragma: allowlist secret
-    page.params.videoId ? (page.params.videoId as Id<"videos">) : undefined, // pragma: allowlist secret
-  ); // pragma: allowlist secret
-  const pathname = $derived(page.url.pathname); // pragma: allowlist secret
-  const search = $derived(page.url.search); // pragma: allowlist secret
+  const uploadableProjectIds = $derived(
+    new Set((uploadTargetsQuery.data ?? []).map((target) => target.projectId)),
+  );
 
-  const publicPlaybackIdQuery = useQuery( // pragma: allowlist secret
-    api.videos.getPublicIdByVideoId, // pragma: allowlist secret
-    () => (routeVideoId ? { videoId: routeVideoId } : "skip"), // pragma: allowlist secret
-  ); // pragma: allowlist secret
+  const canUploadToCurrentProject = $derived(
+    routeProjectId ? uploadableProjectIds.has(routeProjectId) : false,
+  );
 
-  const uploadTargetsQuery = useQuery( // pragma: allowlist secret
-    api.projects.listUploadTargets, // pragma: allowlist secret
-    () => { // pragma: allowlist secret
-      if (!isLoaded || !userId) return "skip"; // pragma: allowlist secret
-      return teamSlug ? { teamSlug } : {}; // pragma: allowlist secret
-    }, // pragma: allowlist secret
-  ); // pragma: allowlist secret
+  const requestUpload = async (inputFiles: File[], preferredProjectId?: Id<"projects">) => { 
+    const files = inputFiles.filter( 
+      (file) => file.type.startsWith("video/") || /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(file.name), 
+    ); 
+    if (files.length === 0) return; 
 
-  const uploadableProjectIds = $derived( // pragma: allowlist secret
-    new Set((uploadTargetsQuery.data ?? []).map((target) => target.projectId)), // pragma: allowlist secret
-  ); // pragma: allowlist secret
+    if (preferredProjectId) { 
+      await uploadManager.uploadFilesToProject(preferredProjectId, files); 
+      return; 
+    } 
 
-  const canUploadToCurrentProject = $derived( // pragma: allowlist secret
-    routeProjectId ? uploadableProjectIds.has(routeProjectId) : false, // pragma: allowlist secret
-  ); // pragma: allowlist secret
+    if (routeProjectId && (canUploadToCurrentProject || uploadTargetsQuery.data === undefined)) { 
+      await uploadManager.uploadFilesToProject(routeProjectId, files); 
+      return; 
+    } 
 
-  const getClerk = () => // pragma: allowlist secret
-    browser // pragma: allowlist secret
-      ? ((window as Window & { Clerk?: ClerkLike }).Clerk ?? null) // pragma: allowlist secret
-      : null; // pragma: allowlist secret
+    if (uploadTargetsQuery.data && uploadTargetsQuery.data.length === 0) { 
+      window.alert("You do not have upload access to any projects."); 
+      return; 
+    } 
 
-  const syncAuthState = () => { // pragma: allowlist secret
-    const clerk = getClerk(); // pragma: allowlist secret
-    if (!clerk) return false; // pragma: allowlist secret
-    if (!clerk.loaded) return false; // pragma: allowlist secret
-    userId = clerk.user?.id ?? null; // pragma: allowlist secret
-    isLoaded = true; // pragma: allowlist secret
-    return true; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+    pendingFiles = files; 
+    projectPickerOpen = true; 
+  }; 
 
-  const requestUpload = async (inputFiles: File[], preferredProjectId?: Id<"projects">) => { // pragma: allowlist secret
-    const files = inputFiles.filter( // pragma: allowlist secret
-      (file) => file.type.startsWith("video/") || /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(file.name), // pragma: allowlist secret
-    ); // pragma: allowlist secret
-    if (files.length === 0) return; // pragma: allowlist secret
+  const handleProjectSelected = async (projectId: Id<"projects">) => { 
+    const files = pendingFiles; 
+    if (!files?.length) return; 
+    projectPickerOpen = false; 
+    pendingFiles = null; 
+    await uploadManager.uploadFilesToProject(projectId, files); 
+  }; 
 
-    if (preferredProjectId) { // pragma: allowlist secret
-      await uploadManager.uploadFilesToProject(preferredProjectId, files); // pragma: allowlist secret
-      return; // pragma: allowlist secret
-    } // pragma: allowlist secret
+  setDashboardUploadContext({
+    get uploads() {
+      return uploadManager.uploads;
+    },
+    requestUpload,
+    cancelUpload: uploadManager.cancelUpload,
+  });
 
-    if (routeProjectId && (canUploadToCurrentProject || uploadTargetsQuery.data === undefined)) { // pragma: allowlist secret
-      await uploadManager.uploadFilesToProject(routeProjectId, files); // pragma: allowlist secret
-      return; // pragma: allowlist secret
-    } // pragma: allowlist secret
+  $effect(() => { 
+    if (!browser) return; 
 
-    if (uploadTargetsQuery.data && uploadTargetsQuery.data.length === 0) { // pragma: allowlist secret
-      window.alert("You do not have upload access to any projects."); // pragma: allowlist secret
-      return; // pragma: allowlist secret
-    } // pragma: allowlist secret
+    const handleDragEnter = (event: DragEvent) => { 
+      if (!Array.from(event.dataTransfer?.types ?? []).includes("Files")) return; 
+      event.preventDefault(); 
+      dragDepth += 1; 
+      isGlobalDragActive = true; 
+    }; 
 
-    pendingFiles = files; // pragma: allowlist secret
-    projectPickerOpen = true; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+    const handleDragOver = (event: DragEvent) => { 
+      if (!Array.from(event.dataTransfer?.types ?? []).includes("Files")) return; 
+      event.preventDefault(); 
+      isGlobalDragActive = true; 
+    }; 
 
-  const handleProjectSelected = async (projectId: Id<"projects">) => { // pragma: allowlist secret
-    const files = pendingFiles; // pragma: allowlist secret
-    if (!files?.length) return; // pragma: allowlist secret
-    projectPickerOpen = false; // pragma: allowlist secret
-    pendingFiles = null; // pragma: allowlist secret
-    await uploadManager.uploadFilesToProject(projectId, files); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+    const handleDragLeave = (event: DragEvent) => { 
+      if (!Array.from(event.dataTransfer?.types ?? []).includes("Files")) return; 
+      event.preventDefault(); 
+      dragDepth = Math.max(0, dragDepth - 1); 
+      if (dragDepth === 0) { 
+        isGlobalDragActive = false; 
+      } 
+    }; 
 
-  setDashboardUploadContext({ // pragma: allowlist secret
-    get uploads() { // pragma: allowlist secret
-      return uploadManager.uploads; // pragma: allowlist secret
-    }, // pragma: allowlist secret
-    requestUpload, // pragma: allowlist secret
-    cancelUpload: uploadManager.cancelUpload, // pragma: allowlist secret
-  }); // pragma: allowlist secret
+    const handleDrop = (event: DragEvent) => { 
+      if (!Array.from(event.dataTransfer?.types ?? []).includes("Files")) return; 
+      event.preventDefault(); 
+      dragDepth = 0; 
+      isGlobalDragActive = false; 
 
-  $effect(() => { // pragma: allowlist secret
-    return () => { // pragma: allowlist secret
-      void convex.close(); // pragma: allowlist secret
-    }; // pragma: allowlist secret
-  }); // pragma: allowlist secret
+      const files = Array.from(event.dataTransfer?.files ?? []).filter( 
+        (file) => file.type.startsWith("video/") || /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(file.name), 
+      ); 
+      if (files.length === 0) return; 
+      void requestUpload(files); 
+    }; 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!browser) return; // pragma: allowlist secret
+    window.addEventListener("dragenter", handleDragEnter); 
+    window.addEventListener("dragover", handleDragOver); 
+    window.addEventListener("dragleave", handleDragLeave); 
+    window.addEventListener("drop", handleDrop); 
 
-    convex.setAuth(async ({ forceRefreshToken }) => { // pragma: allowlist secret
-      const clerk = getClerk(); // pragma: allowlist secret
-      if (!clerk?.session?.getToken) return null; // pragma: allowlist secret
-      try { // pragma: allowlist secret
-        return await clerk.session.getToken({ // pragma: allowlist secret
-          template: "convex", // pragma: allowlist secret
-          skipCache: forceRefreshToken, // pragma: allowlist secret
-        }); // pragma: allowlist secret
-      } catch { // pragma: allowlist secret
-        return null; // pragma: allowlist secret
-      } // pragma: allowlist secret
-    }); // pragma: allowlist secret
-  }); // pragma: allowlist secret
+    return () => { 
+      window.removeEventListener("dragenter", handleDragEnter); 
+      window.removeEventListener("dragover", handleDragOver); 
+      window.removeEventListener("dragleave", handleDragLeave); 
+      window.removeEventListener("drop", handleDrop); 
+    }; 
+  }); 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!browser) return; // pragma: allowlist secret
+  const isResolvingPublicPlaybackExemption = $derived( 
+    Boolean(isLoaded && !userId && routeVideoId) && publicPlaybackIdQuery.data === undefined, 
+  ); 
 
-    if (syncAuthState()) { // pragma: allowlist secret
-      return; // pragma: allowlist secret
-    } // pragma: allowlist secret
+  $effect(() => { 
+    if (!browser || !isLoaded || userId) return; 
 
-    let attempts = 0; // pragma: allowlist secret
-    const intervalId = window.setInterval(() => { // pragma: allowlist secret
-      attempts += 1; // pragma: allowlist secret
-      if (syncAuthState()) { // pragma: allowlist secret
-        window.clearInterval(intervalId); // pragma: allowlist secret
-        return; // pragma: allowlist secret
-      } // pragma: allowlist secret
-      if (attempts >= 40) { // pragma: allowlist secret
-        isLoaded = true; // pragma: allowlist secret
-        userId = null; // pragma: allowlist secret
-        window.clearInterval(intervalId); // pragma: allowlist secret
-      } // pragma: allowlist secret
-    }, 250); // pragma: allowlist secret
+    if (routeVideoId) { 
+      if (publicPlaybackIdQuery.data === undefined) return; 
+      if (publicPlaybackIdQuery.data) { 
+        window.location.replace(`/watch/${publicPlaybackIdQuery.data}`); 
+        return; 
+      } 
+    } 
 
-    return () => { // pragma: allowlist secret
-      window.clearInterval(intervalId); // pragma: allowlist secret
-    }; // pragma: allowlist secret
-  }); // pragma: allowlist secret
-
-  $effect(() => { // pragma: allowlist secret
-    if (!browser) return; // pragma: allowlist secret
-
-    const handleDragEnter = (event: DragEvent) => { // pragma: allowlist secret
-      if (!Array.from(event.dataTransfer?.types ?? []).includes("Files")) return; // pragma: allowlist secret
-      event.preventDefault(); // pragma: allowlist secret
-      dragDepth += 1; // pragma: allowlist secret
-      isGlobalDragActive = true; // pragma: allowlist secret
-    }; // pragma: allowlist secret
-
-    const handleDragOver = (event: DragEvent) => { // pragma: allowlist secret
-      if (!Array.from(event.dataTransfer?.types ?? []).includes("Files")) return; // pragma: allowlist secret
-      event.preventDefault(); // pragma: allowlist secret
-      isGlobalDragActive = true; // pragma: allowlist secret
-    }; // pragma: allowlist secret
-
-    const handleDragLeave = (event: DragEvent) => { // pragma: allowlist secret
-      if (!Array.from(event.dataTransfer?.types ?? []).includes("Files")) return; // pragma: allowlist secret
-      event.preventDefault(); // pragma: allowlist secret
-      dragDepth = Math.max(0, dragDepth - 1); // pragma: allowlist secret
-      if (dragDepth === 0) { // pragma: allowlist secret
-        isGlobalDragActive = false; // pragma: allowlist secret
-      } // pragma: allowlist secret
-    }; // pragma: allowlist secret
-
-    const handleDrop = (event: DragEvent) => { // pragma: allowlist secret
-      if (!Array.from(event.dataTransfer?.types ?? []).includes("Files")) return; // pragma: allowlist secret
-      event.preventDefault(); // pragma: allowlist secret
-      dragDepth = 0; // pragma: allowlist secret
-      isGlobalDragActive = false; // pragma: allowlist secret
-
-      const files = Array.from(event.dataTransfer?.files ?? []).filter( // pragma: allowlist secret
-        (file) => file.type.startsWith("video/") || /\.(mp4|mov|m4v|webm|avi|mkv)$/i.test(file.name), // pragma: allowlist secret
-      ); // pragma: allowlist secret
-      if (files.length === 0) return; // pragma: allowlist secret
-      void requestUpload(files); // pragma: allowlist secret
-    }; // pragma: allowlist secret
-
-    window.addEventListener("dragenter", handleDragEnter); // pragma: allowlist secret
-    window.addEventListener("dragover", handleDragOver); // pragma: allowlist secret
-    window.addEventListener("dragleave", handleDragLeave); // pragma: allowlist secret
-    window.addEventListener("drop", handleDrop); // pragma: allowlist secret
-
-    return () => { // pragma: allowlist secret
-      window.removeEventListener("dragenter", handleDragEnter); // pragma: allowlist secret
-      window.removeEventListener("dragover", handleDragOver); // pragma: allowlist secret
-      window.removeEventListener("dragleave", handleDragLeave); // pragma: allowlist secret
-      window.removeEventListener("drop", handleDrop); // pragma: allowlist secret
-    }; // pragma: allowlist secret
-  }); // pragma: allowlist secret
-
-  const isResolvingPublicPlaybackExemption = $derived( // pragma: allowlist secret
-    Boolean(isLoaded && !userId && routeVideoId) && publicPlaybackIdQuery.data === undefined, // pragma: allowlist secret
-  ); // pragma: allowlist secret
-
-  $effect(() => { // pragma: allowlist secret
-    if (!browser || !isLoaded || userId) return; // pragma: allowlist secret
-
-    if (routeVideoId) { // pragma: allowlist secret
-      if (publicPlaybackIdQuery.data === undefined) return; // pragma: allowlist secret
-      if (publicPlaybackIdQuery.data) { // pragma: allowlist secret
-        window.location.replace(`/watch/${publicPlaybackIdQuery.data}`); // pragma: allowlist secret
-        return; // pragma: allowlist secret
-      } // pragma: allowlist secret
-    } // pragma: allowlist secret
-
-    const redirectUrl = `${pathname}${search}`; // pragma: allowlist secret
-    window.location.replace(`/sign-in?redirect_url=${encodeURIComponent(redirectUrl)}`); // pragma: allowlist secret
-  }); // pragma: allowlist secret
+    const redirectUrl = `${pathname}${search}`; 
+    window.location.replace(`/sign-in?redirect_url=${encodeURIComponent(redirectUrl)}`); 
+  }); 
 </script>
 
 {#if !isLoaded}

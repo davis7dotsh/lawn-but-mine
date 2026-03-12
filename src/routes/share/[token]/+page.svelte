@@ -1,5 +1,5 @@
-<script lang="ts">// pragma: allowlist secret
-  import { page } from "$app/state"; // pragma: allowlist secret
+<script lang="ts">
+  import { page } from "$app/state"; 
   import { setConvexClientContext, useQuery } from "convex-svelte";
   import { AlertCircle, Lock, Video } from "lucide-svelte";
   import { api } from "@convex/_generated/api";

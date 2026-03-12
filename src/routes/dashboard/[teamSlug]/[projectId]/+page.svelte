@@ -1,210 +1,210 @@
-<script lang="ts">// pragma: allowlist secret
-  import { goto } from "$app/navigation"; // pragma: allowlist secret
-  import { browser } from "$app/environment"; // pragma: allowlist secret
-  import { page } from "$app/state"; // pragma: allowlist secret
-  import { api } from "@convex/_generated/api"; // pragma: allowlist secret
-  import type { Id } from "@convex/_generated/dataModel"; // pragma: allowlist secret
-  import { useConvexClient, useQuery } from "convex-svelte"; // pragma: allowlist secret
-  import { // pragma: allowlist secret
-    Download, // pragma: allowlist secret
-    Eye, // pragma: allowlist secret
-    Grid3X3, // pragma: allowlist secret
-    LayoutList, // pragma: allowlist secret
-    Link as LinkIcon, // pragma: allowlist secret
-    MessageSquare, // pragma: allowlist secret
-    Play, // pragma: allowlist secret
-    Trash2, // pragma: allowlist secret
-  } from "lucide-svelte"; // pragma: allowlist secret
-  import DashboardHeader from "@/lib/components/DashboardHeader.svelte"; // pragma: allowlist secret
-  import DropZone from "@/lib/components/upload/DropZone.svelte"; // pragma: allowlist secret
-  import UploadButton from "@/lib/components/upload/UploadButton.svelte"; // pragma: allowlist secret
-  import VideoWorkflowStatusControl, { // pragma: allowlist secret
-    type VideoWorkflowStatus, // pragma: allowlist secret
-  } from "@/lib/components/videos/VideoWorkflowStatusControl.svelte"; // pragma: allowlist secret
-  import { useDashboardUploadContext } from "@/lib/dashboardUploadContext.svelte"; // pragma: allowlist secret
-  import { formatDuration, formatRelativeTime } from "@/lib/utils"; // pragma: allowlist secret
-  import { makeRouteQuerySpec, prewarmIntent, prewarmSpecs } from "@/lib/convex/prewarm"; // pragma: allowlist secret
-  import { projectPath, teamHomePath, videoPath } from "@/lib/routes"; // pragma: allowlist secret
+<script lang="ts">
+  import { goto } from "$app/navigation"; 
+  import { browser } from "$app/environment"; 
+  import { page } from "$app/state"; 
+  import { api } from "@convex/_generated/api"; 
+  import type { Id } from "@convex/_generated/dataModel"; 
+  import { useConvexClient, useQuery } from "convex-svelte"; 
+  import { 
+    Download, 
+    Eye, 
+    Grid3X3, 
+    LayoutList, 
+    Link as LinkIcon, 
+    MessageSquare, 
+    Play, 
+    Trash2, 
+  } from "lucide-svelte"; 
+  import DashboardHeader from "@/lib/components/DashboardHeader.svelte"; 
+  import DropZone from "@/lib/components/upload/DropZone.svelte"; 
+  import UploadButton from "@/lib/components/upload/UploadButton.svelte"; 
+  import VideoWorkflowStatusControl, { 
+    type VideoWorkflowStatus, 
+  } from "@/lib/components/videos/VideoWorkflowStatusControl.svelte"; 
+  import { useDashboardUploadContext } from "@/lib/dashboardUploadContext.svelte"; 
+  import { formatDuration, formatRelativeTime } from "@/lib/utils"; 
+  import { makeRouteQuerySpec, prewarmIntent, prewarmSpecs } from "@/lib/convex/prewarm"; 
+  import { projectPath, teamHomePath, videoPath } from "@/lib/routes"; 
 
-  type ViewMode = "grid" | "list"; // pragma: allowlist secret
-  type ShareToastState = { // pragma: allowlist secret
-    tone: "success" | "error"; // pragma: allowlist secret
-    message: string; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  type ViewMode = "grid" | "list"; 
+  type ShareToastState = { 
+    tone: "success" | "error"; 
+    message: string; 
+  }; 
 
-  const convex = useConvexClient(); // pragma: allowlist secret
-  const uploadContext = useDashboardUploadContext(); // pragma: allowlist secret
+  const convex = useConvexClient(); 
+  const uploadContext = useDashboardUploadContext(); 
 
-  let viewMode = $state<ViewMode>("grid"); // pragma: allowlist secret
-  let shareToast = $state<ShareToastState | null>(null); // pragma: allowlist secret
-  let shareToastTimeout: ReturnType<typeof setTimeout> | null = null; // pragma: allowlist secret
+  let viewMode = $state<ViewMode>("grid"); 
+  let shareToast = $state<ShareToastState | null>(null); 
+  let shareToastTimeout: ReturnType<typeof setTimeout> | null = null; 
 
-  const teamSlug = $derived(page.params.teamSlug); // pragma: allowlist secret
-  const projectId = $derived(page.params.projectId as Id<"projects">); // pragma: allowlist secret
-  const pathname = $derived(page.url.pathname); // pragma: allowlist secret
+  const teamSlug = $derived(page.params.teamSlug); 
+  const projectId = $derived(page.params.projectId as Id<"projects">); 
+  const pathname = $derived(page.url.pathname); 
 
-  const contextQuery = useQuery(api.workspace.resolveContext, () => ({ // pragma: allowlist secret
-    teamSlug, // pragma: allowlist secret
-    projectId, // pragma: allowlist secret
-  })); // pragma: allowlist secret
+  const contextQuery = useQuery(api.workspace.resolveContext, () => ({ 
+    teamSlug, 
+    projectId, 
+  })); 
 
-  const resolvedProjectId = $derived( // pragma: allowlist secret
-    contextQuery.data?.project?._id as Id<"projects"> | undefined, // pragma: allowlist secret
-  ); // pragma: allowlist secret
-  const resolvedTeamSlug = $derived(contextQuery.data?.team.slug ?? teamSlug); // pragma: allowlist secret
+  const resolvedProjectId = $derived( 
+    contextQuery.data?.project?._id as Id<"projects"> | undefined, 
+  ); 
+  const resolvedTeamSlug = $derived(contextQuery.data?.team.slug ?? teamSlug); 
 
-  const projectQuery = useQuery(api.projects.get, () => // pragma: allowlist secret
-    resolvedProjectId ? { projectId: resolvedProjectId } : "skip", // pragma: allowlist secret
-  ); // pragma: allowlist secret
-  const videosQuery = useQuery(api.videos.list, () => // pragma: allowlist secret
-    resolvedProjectId ? { projectId: resolvedProjectId } : "skip", // pragma: allowlist secret
-  ); // pragma: allowlist secret
-  const presenceQuery = useQuery(api.videoPresence.listProjectOnlineCounts, () => // pragma: allowlist secret
-    resolvedProjectId ? { projectId: resolvedProjectId } : "skip", // pragma: allowlist secret
-  ); // pragma: allowlist secret
+  const projectQuery = useQuery(api.projects.get, () => 
+    resolvedProjectId ? { projectId: resolvedProjectId } : "skip", 
+  ); 
+  const videosQuery = useQuery(api.videos.list, () => 
+    resolvedProjectId ? { projectId: resolvedProjectId } : "skip", 
+  ); 
+  const presenceQuery = useQuery(api.videoPresence.listProjectOnlineCounts, () => 
+    resolvedProjectId ? { projectId: resolvedProjectId } : "skip", 
+  ); 
 
-  const shouldCanonicalize = $derived( // pragma: allowlist secret
-    Boolean(contextQuery.data && !contextQuery.data.isCanonical && pathname !== contextQuery.data.canonicalPath), // pragma: allowlist secret
-  ); // pragma: allowlist secret
+  const shouldCanonicalize = $derived( 
+    Boolean(contextQuery.data && !contextQuery.data.isCanonical && pathname !== contextQuery.data.canonicalPath), 
+  ); 
 
-  const prewarmTeam = (nextTeamSlug: string) => // pragma: allowlist secret
-    prewarmSpecs(convex, [makeRouteQuerySpec(api.workspace.resolveContext, { teamSlug: nextTeamSlug })]); // pragma: allowlist secret
+  const prewarmTeam = (nextTeamSlug: string) => 
+    prewarmSpecs(convex, [makeRouteQuerySpec(api.workspace.resolveContext, { teamSlug: nextTeamSlug })]); 
 
-  const prewarmVideo = (nextTeamSlug: string, nextProjectId: Id<"projects">, videoId: Id<"videos">) => // pragma: allowlist secret
-    prewarmSpecs(convex, [ // pragma: allowlist secret
-      makeRouteQuerySpec(api.workspace.resolveContext, { // pragma: allowlist secret
-        teamSlug: nextTeamSlug, // pragma: allowlist secret
-        projectId: nextProjectId, // pragma: allowlist secret
-        videoId, // pragma: allowlist secret
-      }), // pragma: allowlist secret
-      makeRouteQuerySpec(api.videos.get, { // pragma: allowlist secret
-        videoId, // pragma: allowlist secret
-      }), // pragma: allowlist secret
-      makeRouteQuerySpec(api.comments.list, { // pragma: allowlist secret
-        videoId, // pragma: allowlist secret
-      }), // pragma: allowlist secret
-      makeRouteQuerySpec(api.comments.getThreaded, { // pragma: allowlist secret
-        videoId, // pragma: allowlist secret
-      }), // pragma: allowlist secret
-    ]); // pragma: allowlist secret
+  const prewarmVideo = (nextTeamSlug: string, nextProjectId: Id<"projects">, videoId: Id<"videos">) => 
+    prewarmSpecs(convex, [ 
+      makeRouteQuerySpec(api.workspace.resolveContext, { 
+        teamSlug: nextTeamSlug, 
+        projectId: nextProjectId, 
+        videoId, 
+      }), 
+      makeRouteQuerySpec(api.videos.get, { 
+        videoId, 
+      }), 
+      makeRouteQuerySpec(api.comments.list, { 
+        videoId, 
+      }), 
+      makeRouteQuerySpec(api.comments.getThreaded, { 
+        videoId, 
+      }), 
+    ]); 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!browser || !shouldCanonicalize || !contextQuery.data) return; // pragma: allowlist secret
-    void goto(contextQuery.data.canonicalPath, { // pragma: allowlist secret
-      replaceState: true, // pragma: allowlist secret
-      noScroll: true, // pragma: allowlist secret
-    }); // pragma: allowlist secret
-  }); // pragma: allowlist secret
+  $effect(() => { 
+    if (!browser || !shouldCanonicalize || !contextQuery.data) return; 
+    void goto(contextQuery.data.canonicalPath, { 
+      replaceState: true, 
+      noScroll: true, 
+    }); 
+  }); 
 
-  $effect(() => { // pragma: allowlist secret
-    return () => { // pragma: allowlist secret
-      if (shareToastTimeout) { // pragma: allowlist secret
-        clearTimeout(shareToastTimeout); // pragma: allowlist secret
-      } // pragma: allowlist secret
-    }; // pragma: allowlist secret
-  }); // pragma: allowlist secret
+  $effect(() => { 
+    return () => { 
+      if (shareToastTimeout) { 
+        clearTimeout(shareToastTimeout); 
+      } 
+    }; 
+  }); 
 
-  const isLoadingData = $derived( // pragma: allowlist secret
-    contextQuery.data === undefined || // pragma: allowlist secret
-      projectQuery.data === undefined || // pragma: allowlist secret
-      videosQuery.data === undefined || // pragma: allowlist secret
-      shouldCanonicalize, // pragma: allowlist secret
-  ); // pragma: allowlist secret
+  const isLoadingData = $derived( 
+    contextQuery.data === undefined || 
+      projectQuery.data === undefined || 
+      videosQuery.data === undefined || 
+      shouldCanonicalize, 
+  ); 
 
-  const handleFilesSelected = async (files: File[]) => { // pragma: allowlist secret
-    if (!resolvedProjectId) return; // pragma: allowlist secret
-    await uploadContext.requestUpload(files, resolvedProjectId); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleFilesSelected = async (files: File[]) => { 
+    if (!resolvedProjectId) return; 
+    await uploadContext.requestUpload(files, resolvedProjectId); 
+  }; 
 
-  const handleDeleteVideo = async (videoId: Id<"videos">) => { // pragma: allowlist secret
-    if (!window.confirm("Are you sure you want to delete this video?")) return; // pragma: allowlist secret
-    await convex.mutation(api.videos.remove, { videoId }); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleDeleteVideo = async (videoId: Id<"videos">) => { 
+    if (!window.confirm("Are you sure you want to delete this video?")) return; 
+    await convex.mutation(api.videos.remove, { videoId }); 
+  }; 
 
-  const handleDownloadVideo = async (videoId: Id<"videos">, title: string) => { // pragma: allowlist secret
-    const result = await convex.action(api.videoActions.getDownloadUrl, { videoId }); // pragma: allowlist secret
-    if (!result?.url) return; // pragma: allowlist secret
+  const handleDownloadVideo = async (videoId: Id<"videos">, title: string) => { 
+    const result = await convex.action(api.videoActions.getDownloadUrl, { videoId }); 
+    if (!result?.url) return; 
 
-    const anchor = document.createElement("a"); // pragma: allowlist secret
-    anchor.href = result.url; // pragma: allowlist secret
-    anchor.download = result.filename ?? `${title}.mp4`; // pragma: allowlist secret
-    document.body.appendChild(anchor); // pragma: allowlist secret
-    anchor.click(); // pragma: allowlist secret
-    document.body.removeChild(anchor); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+    const anchor = document.createElement("a"); 
+    anchor.href = result.url; 
+    anchor.download = result.filename ?? `${title}.mp4`; 
+    document.body.appendChild(anchor); 
+    anchor.click(); 
+    document.body.removeChild(anchor); 
+  }; 
 
-  const handleUpdateWorkflowStatus = async ( // pragma: allowlist secret
-    videoId: Id<"videos">, // pragma: allowlist secret
-    workflowStatus: VideoWorkflowStatus, // pragma: allowlist secret
-  ) => { // pragma: allowlist secret
-    await convex.mutation(api.videos.updateWorkflowStatus, { // pragma: allowlist secret
-      videoId, // pragma: allowlist secret
-      workflowStatus, // pragma: allowlist secret
-    }); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleUpdateWorkflowStatus = async ( 
+    videoId: Id<"videos">, 
+    workflowStatus: VideoWorkflowStatus, 
+  ) => { 
+    await convex.mutation(api.videos.updateWorkflowStatus, { 
+      videoId, 
+      workflowStatus, 
+    }); 
+  }; 
 
-  const showShareToast = (tone: ShareToastState["tone"], message: string) => { // pragma: allowlist secret
-    shareToast = { tone, message }; // pragma: allowlist secret
-    if (shareToastTimeout) { // pragma: allowlist secret
-      clearTimeout(shareToastTimeout); // pragma: allowlist secret
-    } // pragma: allowlist secret
-    shareToastTimeout = setTimeout(() => { // pragma: allowlist secret
-      shareToast = null; // pragma: allowlist secret
-      shareToastTimeout = null; // pragma: allowlist secret
-    }, 2400); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const showShareToast = (tone: ShareToastState["tone"], message: string) => { 
+    shareToast = { tone, message }; 
+    if (shareToastTimeout) { 
+      clearTimeout(shareToastTimeout); 
+    } 
+    shareToastTimeout = setTimeout(() => { 
+      shareToast = null; 
+      shareToastTimeout = null; 
+    }, 2400); 
+  }; 
 
-  const copyTextToClipboard = async (text: string) => { // pragma: allowlist secret
-    if (navigator.clipboard?.writeText) { // pragma: allowlist secret
-      await navigator.clipboard.writeText(text); // pragma: allowlist secret
-      return true; // pragma: allowlist secret
-    } // pragma: allowlist secret
+  const copyTextToClipboard = async (text: string) => { 
+    if (navigator.clipboard?.writeText) { 
+      await navigator.clipboard.writeText(text); 
+      return true; 
+    } 
 
-    const textarea = document.createElement("textarea"); // pragma: allowlist secret
-    textarea.value = text; // pragma: allowlist secret
-    textarea.style.position = "fixed"; // pragma: allowlist secret
-    textarea.style.opacity = "0"; // pragma: allowlist secret
-    document.body.appendChild(textarea); // pragma: allowlist secret
-    textarea.focus(); // pragma: allowlist secret
-    textarea.select(); // pragma: allowlist secret
-    const copied = document.execCommand("copy"); // pragma: allowlist secret
-    document.body.removeChild(textarea); // pragma: allowlist secret
-    return copied; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+    const textarea = document.createElement("textarea"); 
+    textarea.value = text; 
+    textarea.style.position = "fixed"; 
+    textarea.style.opacity = "0"; 
+    document.body.appendChild(textarea); 
+    textarea.focus(); 
+    textarea.select(); 
+    const copied = document.execCommand("copy"); 
+    document.body.removeChild(textarea); 
+    return copied; 
+  }; 
 
-  const handleShareVideo = async (video: { // pragma: allowlist secret
-    _id: Id<"videos">; // pragma: allowlist secret
-    publicId?: string; // pragma: allowlist secret
-    status: string; // pragma: allowlist secret
-    visibility: "public" | "private"; // pragma: allowlist secret
-  }) => { // pragma: allowlist secret
-    const canSharePublicly = // pragma: allowlist secret
-      Boolean(video.publicId) && // pragma: allowlist secret
-      video.status === "ready" && // pragma: allowlist secret
-      video.visibility === "public"; // pragma: allowlist secret
-    const path = canSharePublicly // pragma: allowlist secret
-      ? `/watch/${video.publicId}` // pragma: allowlist secret
-      : videoPath(resolvedTeamSlug, projectId, video._id); // pragma: allowlist secret
-    const url = `${window.location.origin}${path}`; // pragma: allowlist secret
+  const handleShareVideo = async (video: { 
+    _id: Id<"videos">; 
+    publicId?: string; 
+    status: string; 
+    visibility: "public" | "private"; 
+  }) => { 
+    const canSharePublicly = 
+      Boolean(video.publicId) && 
+      video.status === "ready" && 
+      video.visibility === "public"; 
+    const path = canSharePublicly 
+      ? `/watch/${video.publicId}` 
+      : videoPath(resolvedTeamSlug, projectId, video._id); 
+    const url = `${window.location.origin}${path}`; 
 
-    try { // pragma: allowlist secret
-      const copied = await copyTextToClipboard(url); // pragma: allowlist secret
-      if (!copied) { // pragma: allowlist secret
-        showShareToast("error", "Could not copy link"); // pragma: allowlist secret
-        return; // pragma: allowlist secret
-      } // pragma: allowlist secret
-      showShareToast( // pragma: allowlist secret
-        "success", // pragma: allowlist secret
-        canSharePublicly // pragma: allowlist secret
-          ? "Share link copied" // pragma: allowlist secret
-          : "Video link copied (public watch link not available yet)", // pragma: allowlist secret
-      ); // pragma: allowlist secret
-    } catch { // pragma: allowlist secret
-      showShareToast("error", "Could not copy link"); // pragma: allowlist secret
-    } // pragma: allowlist secret
-  }; // pragma: allowlist secret
+    try { 
+      const copied = await copyTextToClipboard(url); 
+      if (!copied) { 
+        showShareToast("error", "Could not copy link"); 
+        return; 
+      } 
+      showShareToast( 
+        "success", 
+        canSharePublicly 
+          ? "Share link copied" 
+          : "Video link copied (public watch link not available yet)", 
+      ); 
+    } catch { 
+      showShareToast("error", "Could not copy link"); 
+    } 
+  }; 
 
-  const canUpload = $derived(projectQuery.data?.role !== "viewer"); // pragma: allowlist secret
+  const canUpload = $derived(projectQuery.data?.role !== "viewer"); 
 </script>
 
 {#if contextQuery.data === null || projectQuery.data === null}

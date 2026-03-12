@@ -1,5 +1,5 @@
-<script lang="ts">// pragma: allowlist secret
-  import { formatRelativeTime, formatTimestamp, getInitials } from "@/lib/utils"; // pragma: allowlist secret
+<script lang="ts">
+  import { formatRelativeTime, formatTimestamp, getInitials } from "@/lib/utils"; 
 
   type CommentEntry = {
     _id: string;

@@ -1,73 +1,73 @@
-<script lang="ts">// pragma: allowlist secret
-  import type { Snippet } from "svelte"; // pragma: allowlist secret
-  import { browser } from "$app/environment"; // pragma: allowlist secret
-  import { api } from "@convex/_generated/api"; // pragma: allowlist secret
-  import { useConvexClient } from "convex-svelte"; // pragma: allowlist secret
-  import { Moon, Sun, UserRound } from "lucide-svelte"; // pragma: allowlist secret
-  import { makeRouteQuerySpec, prewarmIntent, prewarmSpecs } from "@/lib/convex/prewarm"; // pragma: allowlist secret
+<script lang="ts">
+  import type { Snippet } from "svelte"; 
+  import { browser } from "$app/environment"; 
+  import { api } from "@convex/_generated/api"; 
+  import { useConvexClient } from "convex-svelte"; 
+  import { Moon, Sun, UserRound } from "lucide-svelte"; 
+  import { makeRouteQuerySpec, prewarmIntent, prewarmSpecs } from "@/lib/convex/prewarm"; 
 
-  export type PathSegment = { // pragma: allowlist secret
-    label: string; // pragma: allowlist secret
-    href?: string; // pragma: allowlist secret
-    prewarm?: () => void | Promise<void>; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  export type PathSegment = { 
+    label: string; 
+    href?: string; 
+    prewarm?: () => void | Promise<void>; 
+  }; 
 
-  let { // pragma: allowlist secret
-    children, // pragma: allowlist secret
-    paths = [], // pragma: allowlist secret
-  }: { // pragma: allowlist secret
-    children?: Snippet; // pragma: allowlist secret
-    paths?: PathSegment[]; // pragma: allowlist secret
-  } = $props(); // pragma: allowlist secret
+  let { 
+    children, 
+    paths = [], 
+  }: { 
+    children?: Snippet; 
+    paths?: PathSegment[]; 
+  } = $props(); 
 
-  const convex = useConvexClient(); // pragma: allowlist secret
-  let theme = $state<"light" | "dark">("light"); // pragma: allowlist secret
-  let userLabel = $state("account"); // pragma: allowlist secret
+  const convex = useConvexClient(); 
+  let theme = $state<"light" | "dark">("light"); 
+  let userLabel = $state("account"); 
 
-  const prewarmHome = () => // pragma: allowlist secret
-    prewarmSpecs(convex, [makeRouteQuerySpec(api.teams.listWithProjects, {})]); // pragma: allowlist secret
+  const prewarmHome = () => 
+    prewarmSpecs(convex, [makeRouteQuerySpec(api.teams.listWithProjects, {})]); 
 
-  const syncTheme = () => { // pragma: allowlist secret
-    if (!browser) return; // pragma: allowlist secret
-    theme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const syncTheme = () => { 
+    if (!browser) return; 
+    theme = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light"; 
+  }; 
 
-  const toggleTheme = () => { // pragma: allowlist secret
-    if (!browser) return; // pragma: allowlist secret
-    const nextTheme = theme === "dark" ? "light" : "dark"; // pragma: allowlist secret
-    document.documentElement.setAttribute("data-theme", nextTheme); // pragma: allowlist secret
-    window.localStorage.setItem("lawn-theme", nextTheme); // pragma: allowlist secret
-    theme = nextTheme; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const toggleTheme = () => { 
+    if (!browser) return; 
+    const nextTheme = theme === "dark" ? "light" : "dark"; 
+    document.documentElement.setAttribute("data-theme", nextTheme); 
+    window.localStorage.setItem("lawn-theme", nextTheme); 
+    theme = nextTheme; 
+  }; 
 
-  const openUserMenu = async () => { // pragma: allowlist secret
-    if (!browser) return; // pragma: allowlist secret
-    const clerk = (window as Window & { Clerk?: { openUserProfile?: () => void } }).Clerk; // pragma: allowlist secret
-    clerk?.openUserProfile?.(); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const openUserMenu = async () => { 
+    if (!browser) return; 
+    const clerk = (window as Window & { Clerk?: { openUserProfile?: () => void } }).Clerk; 
+    clerk?.openUserProfile?.(); 
+  }; 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!browser) return; // pragma: allowlist secret
-    syncTheme(); // pragma: allowlist secret
+  $effect(() => { 
+    if (!browser) return; 
+    syncTheme(); 
 
-    const clerk = ( // pragma: allowlist secret
-      window as Window & { // pragma: allowlist secret
-        Clerk?: { // pragma: allowlist secret
-          user?: { // pragma: allowlist secret
-            firstName?: string; // pragma: allowlist secret
-            username?: string; // pragma: allowlist secret
-            primaryEmailAddress?: { emailAddress?: string }; // pragma: allowlist secret
-          }; // pragma: allowlist secret
-        }; // pragma: allowlist secret
-      } // pragma: allowlist secret
-    ).Clerk; // pragma: allowlist secret
+    const clerk = ( 
+      window as Window & { 
+        Clerk?: { 
+          user?: { 
+            firstName?: string; 
+            username?: string; 
+            primaryEmailAddress?: { emailAddress?: string }; 
+          }; 
+        }; 
+      } 
+    ).Clerk; 
 
-    userLabel = // pragma: allowlist secret
-      clerk?.user?.firstName || // pragma: allowlist secret
-      clerk?.user?.username || // pragma: allowlist secret
-      clerk?.user?.primaryEmailAddress?.emailAddress || // pragma: allowlist secret
-      "account"; // pragma: allowlist secret
-  }); // pragma: allowlist secret
+    userLabel = 
+      clerk?.user?.firstName || 
+      clerk?.user?.username || 
+      clerk?.user?.primaryEmailAddress?.emailAddress || 
+      "account"; 
+  }); 
 </script>
 
 <header class="flex-shrink-0 border-b-2 border-[#1a1a1a] bg-[#f0f0e8] grid grid-cols-[1fr_auto] sm:grid-cols-[auto_1fr_auto] items-center px-4 sm:px-6">

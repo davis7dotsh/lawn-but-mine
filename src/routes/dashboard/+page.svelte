@@ -1,32 +1,32 @@
-<script lang="ts">// pragma: allowlist secret
-  import type { Id } from "@convex/_generated/dataModel"; // pragma: allowlist secret
-  import { api } from "@convex/_generated/api"; // pragma: allowlist secret
-  import { useConvexClient, useQuery } from "convex-svelte"; // pragma: allowlist secret
-  import { ArrowRight, Folder, Plus, Users } from "lucide-svelte"; // pragma: allowlist secret
-  import DashboardHeader from "@/lib/components/DashboardHeader.svelte"; // pragma: allowlist secret
-  import CreateTeamDialog from "@/lib/components/teams/CreateTeamDialog.svelte"; // pragma: allowlist secret
-  import { makeRouteQuerySpec, prewarmIntent, prewarmSpecs } from "@/lib/convex/prewarm"; // pragma: allowlist secret
-  import { getDashboardBillingLabel } from "@/shared/billingPlans"; // pragma: allowlist secret
-  import { projectPath, teamHomePath, teamSettingsPath } from "@/lib/routes"; // pragma: allowlist secret
+<script lang="ts">
+  import type { Id } from "@convex/_generated/dataModel"; 
+  import { api } from "@convex/_generated/api"; 
+  import { useConvexClient, useQuery } from "convex-svelte"; 
+  import { ArrowRight, Folder, Plus, Users } from "lucide-svelte"; 
+  import DashboardHeader from "@/lib/components/DashboardHeader.svelte"; 
+  import CreateTeamDialog from "@/lib/components/teams/CreateTeamDialog.svelte"; 
+  import { makeRouteQuerySpec, prewarmIntent, prewarmSpecs } from "@/lib/convex/prewarm"; 
+  import { getDashboardBillingLabel } from "@/shared/billingPlans"; 
+  import { projectPath, teamHomePath, teamSettingsPath } from "@/lib/routes"; 
 
-  const convex = useConvexClient(); // pragma: allowlist secret
-  const teamsQuery = useQuery(api.teams.listWithProjects, {}); // pragma: allowlist secret
+  const convex = useConvexClient(); 
+  const teamsQuery = useQuery(api.teams.listWithProjects, {}); 
 
-  let createDialogOpen = $state(false); // pragma: allowlist secret
+  let createDialogOpen = $state(false); 
 
-  const prewarmProject = (teamSlug: string, projectId: Id<"projects">) => // pragma: allowlist secret
-    prewarmSpecs(convex, [ // pragma: allowlist secret
-      makeRouteQuerySpec(api.workspace.resolveContext, { // pragma: allowlist secret
-        teamSlug, // pragma: allowlist secret
-        projectId, // pragma: allowlist secret
-      }), // pragma: allowlist secret
-      makeRouteQuerySpec(api.projects.get, { // pragma: allowlist secret
-        projectId, // pragma: allowlist secret
-      }), // pragma: allowlist secret
-      makeRouteQuerySpec(api.videos.list, { // pragma: allowlist secret
-        projectId, // pragma: allowlist secret
-      }), // pragma: allowlist secret
-    ]); // pragma: allowlist secret
+  const prewarmProject = (teamSlug: string, projectId: Id<"projects">) => 
+    prewarmSpecs(convex, [ 
+      makeRouteQuerySpec(api.workspace.resolveContext, { 
+        teamSlug, 
+        projectId, 
+      }), 
+      makeRouteQuerySpec(api.projects.get, { 
+        projectId, 
+      }), 
+      makeRouteQuerySpec(api.videos.list, { 
+        projectId, 
+      }), 
+    ]); 
 </script>
 
 {#if teamsQuery.data && teamsQuery.data.length === 0}

@@ -1,10 +1,5 @@
 {
-  "include": [
-    "**/*.ts",
-    "**/*.tsx",
-    "**/.server/**/*",
-    "**/.client/**/*"
-  ],
+  "extends": "./.svelte-kit/tsconfig.json",
   "compilerOptions": {
     "target": "ES2022",
     "lib": [
@@ -18,16 +13,6 @@
     ],
     "module": "ES2022",
     "moduleResolution": "bundler",
-    "jsx": "react-jsx",
-    "baseUrl": ".",
-    "paths": {
-      "@/*": [
-        "./src/*"
-      ],
-      "@convex/*": [
-        "./convex/*"
-      ]
-    },
     "allowJs": true,
     "skipLibCheck": true,
     "strict": false,
@@ -38,6 +23,16 @@
     "isolatedModules": true,
     "incremental": true
   },
+  "include": [
+    "src/**/*.d.ts",
+    "src/**/*.ts",
+    "src/**/*.js",
+    "src/**/*.svelte",
+    "convex/**/*.ts",
+    "scripts/**/*.ts",
+    "vite.config.ts",
+    "svelte.config.js"
+  ],
   "exclude": [
     "node_modules",
     "build",

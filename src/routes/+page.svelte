@@ -120,8 +120,8 @@
   </nav>
 
   <section
-    class="relative flex min-h-[85vh] flex-col justify-end overflow-x-clip border-b-2 border-[#1a1a1a] bg-cover bg-center bg-no-repeat px-6 pb-32 pt-32 text-[#f0f0e8] md:pb-24"
-    style="background-image: url('/grassy-bg.avif')"
+    class="relative flex min-h-[85vh] flex-col justify-end overflow-x-clip border-b-2 border-[#1a1a1a] bg-center bg-no-repeat px-6 pb-32 pt-32 text-[#f0f0e8] md:pb-24"
+    style="background: linear-gradient(180deg, #88a570 0%, #6e8d62 24%, #f0f0e8 72%)"
   >
     <div class="pointer-events-none absolute inset-0 bg-black/10"></div>
 

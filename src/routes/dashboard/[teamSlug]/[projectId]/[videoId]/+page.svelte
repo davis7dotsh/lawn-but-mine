@@ -1,443 +1,443 @@
-<script lang="ts">// pragma: allowlist secret
-  import { goto } from "$app/navigation"; // pragma: allowlist secret
-  import { browser } from "$app/environment"; // pragma: allowlist secret
-  import { page } from "$app/state"; // pragma: allowlist secret
-  import { api } from "@convex/_generated/api"; // pragma: allowlist secret
-  import type { Id } from "@convex/_generated/dataModel"; // pragma: allowlist secret
-  import { useConvexClient, useQuery } from "convex-svelte"; // pragma: allowlist secret
-  import { // pragma: allowlist secret
-    Check, // pragma: allowlist secret
-    Edit2, // pragma: allowlist secret
-    Link as LinkIcon, // pragma: allowlist secret
-    MessageSquare, // pragma: allowlist secret
-    MoreVertical, // pragma: allowlist secret
-    RefreshCcw, // pragma: allowlist secret
-    X, // pragma: allowlist secret
-  } from "lucide-svelte"; // pragma: allowlist secret
-  import DashboardHeader from "@/lib/components/DashboardHeader.svelte"; // pragma: allowlist secret
-  import ShareDialog from "@/lib/components/ShareDialog.svelte"; // pragma: allowlist secret
-  import VideoWorkflowStatusControl, { // pragma: allowlist secret
-    type VideoWorkflowStatus, // pragma: allowlist secret
-  } from "@/lib/components/videos/VideoWorkflowStatusControl.svelte"; // pragma: allowlist secret
-  import { formatDuration, formatTimestamp } from "@/lib/utils"; // pragma: allowlist secret
-  import { makeRouteQuerySpec, prewarmSpecs } from "@/lib/convex/prewarm"; // pragma: allowlist secret
-  import { projectPath, teamHomePath } from "@/lib/routes"; // pragma: allowlist secret
+<script lang="ts">
+  import { goto } from "$app/navigation"; 
+  import { browser } from "$app/environment"; 
+  import { page } from "$app/state"; 
+  import { api } from "@convex/_generated/api"; 
+  import type { Id } from "@convex/_generated/dataModel"; 
+  import { useConvexClient, useQuery } from "convex-svelte"; 
+  import { 
+    Check, 
+    Edit2, 
+    Link as LinkIcon, 
+    MessageSquare, 
+    MoreVertical, 
+    RefreshCcw, 
+    X, 
+  } from "lucide-svelte"; 
+  import DashboardHeader from "@/lib/components/DashboardHeader.svelte"; 
+  import ShareDialog from "@/lib/components/ShareDialog.svelte"; 
+  import VideoWorkflowStatusControl, { 
+    type VideoWorkflowStatus, 
+  } from "@/lib/components/videos/VideoWorkflowStatusControl.svelte"; 
+  import { formatDuration, formatTimestamp } from "@/lib/utils"; 
+  import { makeRouteQuerySpec, prewarmSpecs } from "@/lib/convex/prewarm"; 
+  import { projectPath, teamHomePath } from "@/lib/routes"; 
 
-  type Watcher = { // pragma: allowlist secret
-    userId: string; // pragma: allowlist secret
-    online: boolean; // pragma: allowlist secret
-    kind: "member" | "guest"; // pragma: allowlist secret
-    displayName: string; // pragma: allowlist secret
-    avatarUrl?: string; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  type Watcher = { 
+    userId: string; 
+    online: boolean; 
+    kind: "member" | "guest"; 
+    displayName: string; 
+    avatarUrl?: string; 
+  }; 
 
-  type ThreadedComment = { // pragma: allowlist secret
-    _id: Id<"comments">; // pragma: allowlist secret
-    _creationTime: number; // pragma: allowlist secret
-    text: string; // pragma: allowlist secret
-    timestampSeconds: number; // pragma: allowlist secret
-    resolved: boolean; // pragma: allowlist secret
-    userName: string; // pragma: allowlist secret
-    userAvatarUrl?: string; // pragma: allowlist secret
-    replies?: ThreadedComment[]; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  type ThreadedComment = { 
+    _id: Id<"comments">; 
+    _creationTime: number; 
+    text: string; 
+    timestampSeconds: number; 
+    resolved: boolean; 
+    userName: string; 
+    userAvatarUrl?: string; 
+    replies?: ThreadedComment[]; 
+  }; 
 
-  const STORAGE_KEY_CLIENT_ID = "lawn.presence.client_id"; // pragma: allowlist secret
-  const DEFAULT_HEARTBEAT_INTERVAL_MS = 15_000; // pragma: allowlist secret
-  const DISCONNECT_PATH = "videoPresence:disconnect"; // pragma: allowlist secret
-  const convexUrl = import.meta.env.VITE_CONVEX_URL; // pragma: allowlist secret
+  const STORAGE_KEY_CLIENT_ID = "lawn.presence.client_id"; 
+  const DEFAULT_HEARTBEAT_INTERVAL_MS = 15_000; 
+  const DISCONNECT_PATH = "videoPresence:disconnect"; 
+  const convexUrl = import.meta.env.VITE_CONVEX_URL; 
 
-  const convex = useConvexClient(); // pragma: allowlist secret
+  const convex = useConvexClient(); 
 
-  let videoElement = $state<HTMLVideoElement | null>(null); // pragma: allowlist secret
-  let currentTime = $state(0); // pragma: allowlist secret
-  let isEditingTitle = $state(false); // pragma: allowlist secret
-  let editedTitle = $state(""); // pragma: allowlist secret
-  let highlightedCommentId = $state<Id<"comments"> | undefined>(undefined); // pragma: allowlist secret
-  let shareDialogOpen = $state(false); // pragma: allowlist secret
-  let mobileCommentsOpen = $state(false); // pragma: allowlist secret
-  let playbackSession = $state<{ url: string; posterUrl: string } | null>(null); // pragma: allowlist secret
-  let isLoadingPlayback = $state(false); // pragma: allowlist secret
-  let originalPlaybackUrl = $state<string | null>(null); // pragma: allowlist secret
-  let isLoadingOriginalPlayback = $state(false); // pragma: allowlist secret
-  let isRetryingProcessing = $state(false); // pragma: allowlist secret
-  let preferredSource = $state<"mux720" | "original">("original"); // pragma: allowlist secret
-  let hasManuallySelectedSource = $state(false); // pragma: allowlist secret
-  let roomToken = $state<string | null>(null); // pragma: allowlist secret
-  let sessionToken = $state<string | null>(null); // pragma: allowlist secret
-  let clientId = $state<string | null>(null); // pragma: allowlist secret
-  let commentText = $state(""); // pragma: allowlist secret
+  let videoElement = $state<HTMLVideoElement | null>(null); 
+  let currentTime = $state(0); 
+  let isEditingTitle = $state(false); 
+  let editedTitle = $state(""); 
+  let highlightedCommentId = $state<Id<"comments"> | undefined>(undefined); 
+  let shareDialogOpen = $state(false); 
+  let mobileCommentsOpen = $state(false); 
+  let playbackSession = $state<{ url: string; posterUrl: string } | null>(null); 
+  let isLoadingPlayback = $state(false); 
+  let originalPlaybackUrl = $state<string | null>(null); 
+  let isLoadingOriginalPlayback = $state(false); 
+  let isRetryingProcessing = $state(false); 
+  let preferredSource = $state<"mux720" | "original">("original"); 
+  let hasManuallySelectedSource = $state(false); 
+  let roomToken = $state<string | null>(null); 
+  let sessionToken = $state<string | null>(null); 
+  let clientId = $state<string | null>(null); 
+  let commentText = $state(""); 
 
-  const teamSlug = $derived(page.params.teamSlug); // pragma: allowlist secret
-  const projectId = $derived(page.params.projectId as Id<"projects">); // pragma: allowlist secret
-  const videoId = $derived(page.params.videoId as Id<"videos">); // pragma: allowlist secret
-  const pathname = $derived(page.url.pathname); // pragma: allowlist secret
+  const teamSlug = $derived(page.params.teamSlug); 
+  const projectId = $derived(page.params.projectId as Id<"projects">); 
+  const videoId = $derived(page.params.videoId as Id<"videos">); 
+  const pathname = $derived(page.url.pathname); 
 
-  const contextQuery = useQuery(api.workspace.resolveContext, () => ({ // pragma: allowlist secret
-    teamSlug, // pragma: allowlist secret
-    projectId, // pragma: allowlist secret
-    videoId, // pragma: allowlist secret
-  })); // pragma: allowlist secret
+  const contextQuery = useQuery(api.workspace.resolveContext, () => ({ 
+    teamSlug, 
+    projectId, 
+    videoId, 
+  })); 
 
-  const resolvedTeamSlug = $derived(contextQuery.data?.team.slug ?? teamSlug); // pragma: allowlist secret
-  const resolvedProjectId = $derived( // pragma: allowlist secret
-    contextQuery.data?.project?._id as Id<"projects"> | undefined, // pragma: allowlist secret
-  ); // pragma: allowlist secret
-  const resolvedVideoId = $derived( // pragma: allowlist secret
-    contextQuery.data?.video?._id as Id<"videos"> | undefined, // pragma: allowlist secret
-  ); // pragma: allowlist secret
+  const resolvedTeamSlug = $derived(contextQuery.data?.team.slug ?? teamSlug); 
+  const resolvedProjectId = $derived( 
+    contextQuery.data?.project?._id as Id<"projects"> | undefined, 
+  ); 
+  const resolvedVideoId = $derived( 
+    contextQuery.data?.video?._id as Id<"videos"> | undefined, 
+  ); 
 
-  const videoQuery = useQuery(api.videos.get, () => // pragma: allowlist secret
-    resolvedVideoId ? { videoId: resolvedVideoId } : "skip", // pragma: allowlist secret
-  ); // pragma: allowlist secret
-  const commentsQuery = useQuery(api.comments.list, () => // pragma: allowlist secret
-    resolvedVideoId ? { videoId: resolvedVideoId } : "skip", // pragma: allowlist secret
-  ); // pragma: allowlist secret
-  const commentsThreadedQuery = useQuery(api.comments.getThreaded, () => // pragma: allowlist secret
-    resolvedVideoId ? { videoId: resolvedVideoId } : "skip", // pragma: allowlist secret
-  ); // pragma: allowlist secret
-  const presenceStateQuery = useQuery(api.videoPresence.list, () => // pragma: allowlist secret
-    roomToken ? { roomToken } : "skip", // pragma: allowlist secret
-  ); // pragma: allowlist secret
+  const videoQuery = useQuery(api.videos.get, () => 
+    resolvedVideoId ? { videoId: resolvedVideoId } : "skip", 
+  ); 
+  const commentsQuery = useQuery(api.comments.list, () => 
+    resolvedVideoId ? { videoId: resolvedVideoId } : "skip", 
+  ); 
+  const commentsThreadedQuery = useQuery(api.comments.getThreaded, () => 
+    resolvedVideoId ? { videoId: resolvedVideoId } : "skip", 
+  ); 
+  const presenceStateQuery = useQuery(api.videoPresence.list, () => 
+    roomToken ? { roomToken } : "skip", 
+  ); 
 
-  const watchers = $derived( // pragma: allowlist secret
-    (presenceStateQuery.data ?? []) // pragma: allowlist secret
-      .filter((watcher) => watcher.online) // pragma: allowlist secret
-      .map((watcher) => ({ // pragma: allowlist secret
-        userId: watcher.userId, // pragma: allowlist secret
-        online: watcher.online, // pragma: allowlist secret
-        kind: watcher.data?.kind ?? "member", // pragma: allowlist secret
-        displayName: watcher.data?.displayName ?? "Member", // pragma: allowlist secret
-        avatarUrl: watcher.data?.avatarUrl, // pragma: allowlist secret
-      })) as Watcher[], // pragma: allowlist secret
-  ); // pragma: allowlist secret
+  const watchers = $derived( 
+    (presenceStateQuery.data ?? []) 
+      .filter((watcher) => watcher.online) 
+      .map((watcher) => ({ 
+        userId: watcher.userId, 
+        online: watcher.online, 
+        kind: watcher.data?.kind ?? "member", 
+        displayName: watcher.data?.displayName ?? "Member", 
+        avatarUrl: watcher.data?.avatarUrl, 
+      })) as Watcher[], 
+  ); 
 
-  const isPlayable = $derived(videoQuery.data?.status === "ready" && Boolean(videoQuery.data?.muxPlaybackId)); // pragma: allowlist secret
-  const playbackUrl = $derived(playbackSession?.url ?? null); // pragma: allowlist secret
-  const activePlaybackUrl = $derived( // pragma: allowlist secret
-    preferredSource === "mux720" // pragma: allowlist secret
-      ? playbackUrl ?? originalPlaybackUrl // pragma: allowlist secret
-      : originalPlaybackUrl ?? playbackUrl, // pragma: allowlist secret
-  ); // pragma: allowlist secret
-  const activeQualityId = $derived( // pragma: allowlist secret
-    activePlaybackUrl && playbackUrl && activePlaybackUrl === playbackUrl ? "mux720" : "original", // pragma: allowlist secret
-  ); // pragma: allowlist secret
-  const isUsingOriginalFallback = $derived( // pragma: allowlist secret
-    Boolean(activePlaybackUrl && activePlaybackUrl === originalPlaybackUrl && !playbackUrl), // pragma: allowlist secret
-  ); // pragma: allowlist secret
-  const shouldCanonicalize = $derived( // pragma: allowlist secret
-    Boolean(contextQuery.data && !contextQuery.data.isCanonical && pathname !== contextQuery.data.canonicalPath), // pragma: allowlist secret
-  ); // pragma: allowlist secret
+  const isPlayable = $derived(videoQuery.data?.status === "ready" && Boolean(videoQuery.data?.muxPlaybackId)); 
+  const playbackUrl = $derived(playbackSession?.url ?? null); 
+  const activePlaybackUrl = $derived( 
+    preferredSource === "mux720" 
+      ? playbackUrl ?? originalPlaybackUrl 
+      : originalPlaybackUrl ?? playbackUrl, 
+  ); 
+  const activeQualityId = $derived( 
+    activePlaybackUrl && playbackUrl && activePlaybackUrl === playbackUrl ? "mux720" : "original", 
+  ); 
+  const isUsingOriginalFallback = $derived( 
+    Boolean(activePlaybackUrl && activePlaybackUrl === originalPlaybackUrl && !playbackUrl), 
+  ); 
+  const shouldCanonicalize = $derived( 
+    Boolean(contextQuery.data && !contextQuery.data.isCanonical && pathname !== contextQuery.data.canonicalPath), 
+  ); 
 
-  const prewarmTeam = (nextTeamSlug: string) => // pragma: allowlist secret
-    prewarmSpecs(convex, [makeRouteQuerySpec(api.workspace.resolveContext, { teamSlug: nextTeamSlug })]); // pragma: allowlist secret
+  const prewarmTeam = (nextTeamSlug: string) => 
+    prewarmSpecs(convex, [makeRouteQuerySpec(api.workspace.resolveContext, { teamSlug: nextTeamSlug })]); 
 
-  const prewarmProject = (nextTeamSlug: string, nextProjectId: Id<"projects">) => // pragma: allowlist secret
-    prewarmSpecs(convex, [ // pragma: allowlist secret
-      makeRouteQuerySpec(api.workspace.resolveContext, { // pragma: allowlist secret
-        teamSlug: nextTeamSlug, // pragma: allowlist secret
-        projectId: nextProjectId, // pragma: allowlist secret
-      }), // pragma: allowlist secret
-      makeRouteQuerySpec(api.projects.get, { // pragma: allowlist secret
-        projectId: nextProjectId, // pragma: allowlist secret
-      }), // pragma: allowlist secret
-      makeRouteQuerySpec(api.videos.list, { // pragma: allowlist secret
-        projectId: nextProjectId, // pragma: allowlist secret
-      }), // pragma: allowlist secret
-    ]); // pragma: allowlist secret
+  const prewarmProject = (nextTeamSlug: string, nextProjectId: Id<"projects">) => 
+    prewarmSpecs(convex, [ 
+      makeRouteQuerySpec(api.workspace.resolveContext, { 
+        teamSlug: nextTeamSlug, 
+        projectId: nextProjectId, 
+      }), 
+      makeRouteQuerySpec(api.projects.get, { 
+        projectId: nextProjectId, 
+      }), 
+      makeRouteQuerySpec(api.videos.list, { 
+        projectId: nextProjectId, 
+      }), 
+    ]); 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!browser || !shouldCanonicalize || !contextQuery.data) return; // pragma: allowlist secret
-    void goto(contextQuery.data.canonicalPath, { // pragma: allowlist secret
-      replaceState: true, // pragma: allowlist secret
-      noScroll: true, // pragma: allowlist secret
-    }); // pragma: allowlist secret
-  }); // pragma: allowlist secret
+  $effect(() => { 
+    if (!browser || !shouldCanonicalize || !contextQuery.data) return; 
+    void goto(contextQuery.data.canonicalPath, { 
+      replaceState: true, 
+      noScroll: true, 
+    }); 
+  }); 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!resolvedVideoId || !isPlayable) { // pragma: allowlist secret
-      playbackSession = null; // pragma: allowlist secret
-      isLoadingPlayback = false; // pragma: allowlist secret
-      return; // pragma: allowlist secret
-    } // pragma: allowlist secret
+  $effect(() => { 
+    if (!resolvedVideoId || !isPlayable) { 
+      playbackSession = null; 
+      isLoadingPlayback = false; 
+      return; 
+    } 
 
-    let cancelled = false; // pragma: allowlist secret
-    isLoadingPlayback = true; // pragma: allowlist secret
+    let cancelled = false; 
+    isLoadingPlayback = true; 
 
-    void convex // pragma: allowlist secret
-      .action(api.videoActions.getPlaybackSession, { videoId: resolvedVideoId }) // pragma: allowlist secret
-      .then((session) => { // pragma: allowlist secret
-        if (cancelled) return; // pragma: allowlist secret
-        playbackSession = session; // pragma: allowlist secret
-      }) // pragma: allowlist secret
-      .catch(() => { // pragma: allowlist secret
-        if (cancelled) return; // pragma: allowlist secret
-        playbackSession = null; // pragma: allowlist secret
-      }) // pragma: allowlist secret
-      .finally(() => { // pragma: allowlist secret
-        if (cancelled) return; // pragma: allowlist secret
-        isLoadingPlayback = false; // pragma: allowlist secret
-      }); // pragma: allowlist secret
+    void convex 
+      .action(api.videoActions.getPlaybackSession, { videoId: resolvedVideoId }) 
+      .then((session) => { 
+        if (cancelled) return; 
+        playbackSession = session; 
+      }) 
+      .catch(() => { 
+        if (cancelled) return; 
+        playbackSession = null; 
+      }) 
+      .finally(() => { 
+        if (cancelled) return; 
+        isLoadingPlayback = false; 
+      }); 
 
-    return () => { // pragma: allowlist secret
-      cancelled = true; // pragma: allowlist secret
-    }; // pragma: allowlist secret
-  }); // pragma: allowlist secret
+    return () => { 
+      cancelled = true; 
+    }; 
+  }); 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!resolvedVideoId || !videoQuery.data || videoQuery.data.status === "uploading") { // pragma: allowlist secret
-      originalPlaybackUrl = null; // pragma: allowlist secret
-      isLoadingOriginalPlayback = false; // pragma: allowlist secret
-      return; // pragma: allowlist secret
-    } // pragma: allowlist secret
+  $effect(() => { 
+    if (!resolvedVideoId || !videoQuery.data || videoQuery.data.status === "uploading") { 
+      originalPlaybackUrl = null; 
+      isLoadingOriginalPlayback = false; 
+      return; 
+    } 
 
-    let cancelled = false; // pragma: allowlist secret
-    isLoadingOriginalPlayback = true; // pragma: allowlist secret
+    let cancelled = false; 
+    isLoadingOriginalPlayback = true; 
 
-    void convex // pragma: allowlist secret
-      .action(api.videoActions.getOriginalPlaybackUrl, { videoId: resolvedVideoId }) // pragma: allowlist secret
-      .then((result) => { // pragma: allowlist secret
-        if (cancelled) return; // pragma: allowlist secret
-        originalPlaybackUrl = result.url; // pragma: allowlist secret
-      }) // pragma: allowlist secret
-      .catch(() => { // pragma: allowlist secret
-        if (cancelled) return; // pragma: allowlist secret
-        originalPlaybackUrl = null; // pragma: allowlist secret
-      }) // pragma: allowlist secret
-      .finally(() => { // pragma: allowlist secret
-        if (cancelled) return; // pragma: allowlist secret
-        isLoadingOriginalPlayback = false; // pragma: allowlist secret
-      }); // pragma: allowlist secret
+    void convex 
+      .action(api.videoActions.getOriginalPlaybackUrl, { videoId: resolvedVideoId }) 
+      .then((result) => { 
+        if (cancelled) return; 
+        originalPlaybackUrl = result.url; 
+      }) 
+      .catch(() => { 
+        if (cancelled) return; 
+        originalPlaybackUrl = null; 
+      }) 
+      .finally(() => { 
+        if (cancelled) return; 
+        isLoadingOriginalPlayback = false; 
+      }); 
 
-    return () => { // pragma: allowlist secret
-      cancelled = true; // pragma: allowlist secret
-    }; // pragma: allowlist secret
-  }); // pragma: allowlist secret
+    return () => { 
+      cancelled = true; 
+    }; 
+  }); 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!resolvedVideoId) return; // pragma: allowlist secret
-    hasManuallySelectedSource = false; // pragma: allowlist secret
-    preferredSource = "original"; // pragma: allowlist secret
-  }); // pragma: allowlist secret
+  $effect(() => { 
+    if (!resolvedVideoId) return; 
+    hasManuallySelectedSource = false; 
+    preferredSource = "original"; 
+  }); 
 
-  $effect(() => { // pragma: allowlist secret
-    if (hasManuallySelectedSource) return; // pragma: allowlist secret
-    if (playbackUrl) { // pragma: allowlist secret
-      preferredSource = "mux720"; // pragma: allowlist secret
-      return; // pragma: allowlist secret
-    } // pragma: allowlist secret
-    if (originalPlaybackUrl) { // pragma: allowlist secret
-      preferredSource = "original"; // pragma: allowlist secret
-    } // pragma: allowlist secret
-  }); // pragma: allowlist secret
+  $effect(() => { 
+    if (hasManuallySelectedSource) return; 
+    if (playbackUrl) { 
+      preferredSource = "mux720"; 
+      return; 
+    } 
+    if (originalPlaybackUrl) { 
+      preferredSource = "original"; 
+    } 
+  }); 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!browser || !import.meta.env.DEV || !resolvedVideoId || videoQuery.data?.status !== "processing") { // pragma: allowlist secret
-      return; // pragma: allowlist secret
-    } // pragma: allowlist secret
+  $effect(() => { 
+    if (!browser || !import.meta.env.DEV || !resolvedVideoId || videoQuery.data?.status !== "processing") { 
+      return; 
+    } 
 
-    let cancelled = false; // pragma: allowlist secret
-    let timeoutId: ReturnType<typeof setTimeout> | null = null; // pragma: allowlist secret
+    let cancelled = false; 
+    let timeoutId: ReturnType<typeof setTimeout> | null = null; 
 
-    const schedule = (delayMs: number) => { // pragma: allowlist secret
-      timeoutId = setTimeout(() => { // pragma: allowlist secret
-        void tick(); // pragma: allowlist secret
-      }, delayMs); // pragma: allowlist secret
-    }; // pragma: allowlist secret
+    const schedule = (delayMs: number) => { 
+      timeoutId = setTimeout(() => { 
+        void tick(); 
+      }, delayMs); 
+    }; 
 
-    const tick = async () => { // pragma: allowlist secret
-      if (cancelled) return; // pragma: allowlist secret
+    const tick = async () => { 
+      if (cancelled) return; 
 
-      if (document.visibilityState === "hidden") { // pragma: allowlist secret
-        schedule(12_000); // pragma: allowlist secret
-        return; // pragma: allowlist secret
-      } // pragma: allowlist secret
+      if (document.visibilityState === "hidden") { 
+        schedule(12_000); 
+        return; 
+      } 
 
-      try { // pragma: allowlist secret
-        const result = await convex.action(api.videoActions.pollMuxProcessingStatus, { // pragma: allowlist secret
-          videoId: resolvedVideoId, // pragma: allowlist secret
-        }); // pragma: allowlist secret
-        if (cancelled || result.status !== "processing") return; // pragma: allowlist secret
-        schedule(5_000); // pragma: allowlist secret
-      } catch { // pragma: allowlist secret
-        if (cancelled) return; // pragma: allowlist secret
-        schedule(10_000); // pragma: allowlist secret
-      } // pragma: allowlist secret
-    }; // pragma: allowlist secret
+      try { 
+        const result = await convex.action(api.videoActions.pollMuxProcessingStatus, { 
+          videoId: resolvedVideoId, 
+        }); 
+        if (cancelled || result.status !== "processing") return; 
+        schedule(5_000); 
+      } catch { 
+        if (cancelled) return; 
+        schedule(10_000); 
+      } 
+    }; 
 
-    void tick(); // pragma: allowlist secret
+    void tick(); 
 
-    return () => { // pragma: allowlist secret
-      cancelled = true; // pragma: allowlist secret
-      if (timeoutId) { // pragma: allowlist secret
-        clearTimeout(timeoutId); // pragma: allowlist secret
-      } // pragma: allowlist secret
-    }; // pragma: allowlist secret
-  }); // pragma: allowlist secret
+    return () => { 
+      cancelled = true; 
+      if (timeoutId) { 
+        clearTimeout(timeoutId); 
+      } 
+    }; 
+  }); 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!browser || !resolvedVideoId) return; // pragma: allowlist secret
+  $effect(() => { 
+    if (!browser || !resolvedVideoId) return; 
 
-    const existingClientId = window.localStorage.getItem(STORAGE_KEY_CLIENT_ID); // pragma: allowlist secret
-    if (existingClientId) { // pragma: allowlist secret
-      clientId = existingClientId; // pragma: allowlist secret
-      return; // pragma: allowlist secret
-    } // pragma: allowlist secret
+    const existingClientId = window.localStorage.getItem(STORAGE_KEY_CLIENT_ID); 
+    if (existingClientId) { 
+      clientId = existingClientId; 
+      return; 
+    } 
 
-    const nextClientId = crypto.randomUUID().replace(/-/g, ""); // pragma: allowlist secret
-    window.localStorage.setItem(STORAGE_KEY_CLIENT_ID, nextClientId); // pragma: allowlist secret
-    clientId = nextClientId; // pragma: allowlist secret
-  }); // pragma: allowlist secret
+    const nextClientId = crypto.randomUUID().replace(/-/g, ""); 
+    window.localStorage.setItem(STORAGE_KEY_CLIENT_ID, nextClientId); 
+    clientId = nextClientId; 
+  }); 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!browser || !resolvedVideoId || !clientId) { // pragma: allowlist secret
-      roomToken = null; // pragma: allowlist secret
-      return; // pragma: allowlist secret
-    } // pragma: allowlist secret
+  $effect(() => { 
+    if (!browser || !resolvedVideoId || !clientId) { 
+      roomToken = null; 
+      return; 
+    } 
 
-    let active = true; // pragma: allowlist secret
-    const currentSessionId = crypto.randomUUID(); // pragma: allowlist secret
+    let active = true; 
+    const currentSessionId = crypto.randomUUID(); 
 
-    const runHeartbeat = async () => { // pragma: allowlist secret
-      const result = await convex.mutation(api.videoPresence.heartbeat, { // pragma: allowlist secret
-        videoId: resolvedVideoId, // pragma: allowlist secret
-        sessionId: currentSessionId, // pragma: allowlist secret
-        clientId, // pragma: allowlist secret
-        interval: DEFAULT_HEARTBEAT_INTERVAL_MS, // pragma: allowlist secret
-      }); // pragma: allowlist secret
+    const runHeartbeat = async () => { 
+      const result = await convex.mutation(api.videoPresence.heartbeat, { 
+        videoId: resolvedVideoId, 
+        sessionId: currentSessionId, 
+        clientId, 
+        interval: DEFAULT_HEARTBEAT_INTERVAL_MS, 
+      }); 
 
-      if (!active) return; // pragma: allowlist secret
-      sessionToken = result.sessionToken; // pragma: allowlist secret
-      roomToken = result.roomToken; // pragma: allowlist secret
-    }; // pragma: allowlist secret
+      if (!active) return; 
+      sessionToken = result.sessionToken; 
+      roomToken = result.roomToken; 
+    }; 
 
-    const handleBeforeUnload = () => { // pragma: allowlist secret
-      if (!sessionToken) return; // pragma: allowlist secret
-      const payload = { // pragma: allowlist secret
-        path: DISCONNECT_PATH, // pragma: allowlist secret
-        args: { sessionToken }, // pragma: allowlist secret
-      }; // pragma: allowlist secret
-      const blob = new Blob([JSON.stringify(payload)], { // pragma: allowlist secret
-        type: "application/json", // pragma: allowlist secret
-      }); // pragma: allowlist secret
-      if (convexUrl) { // pragma: allowlist secret
-        navigator.sendBeacon(`${convexUrl}/api/mutation`, blob); // pragma: allowlist secret
-      } // pragma: allowlist secret
-    }; // pragma: allowlist secret
+    const handleBeforeUnload = () => { 
+      if (!sessionToken) return; 
+      const payload = { 
+        path: DISCONNECT_PATH, 
+        args: { sessionToken }, 
+      }; 
+      const blob = new Blob([JSON.stringify(payload)], { 
+        type: "application/json", 
+      }); 
+      if (convexUrl) { 
+        navigator.sendBeacon(`${convexUrl}/api/mutation`, blob); 
+      } 
+    }; 
 
-    void runHeartbeat(); // pragma: allowlist secret
-    const intervalId = window.setInterval(() => { // pragma: allowlist secret
-      void runHeartbeat(); // pragma: allowlist secret
-    }, DEFAULT_HEARTBEAT_INTERVAL_MS); // pragma: allowlist secret
+    void runHeartbeat(); 
+    const intervalId = window.setInterval(() => { 
+      void runHeartbeat(); 
+    }, DEFAULT_HEARTBEAT_INTERVAL_MS); 
 
-    window.addEventListener("beforeunload", handleBeforeUnload); // pragma: allowlist secret
+    window.addEventListener("beforeunload", handleBeforeUnload); 
 
-    return () => { // pragma: allowlist secret
-      active = false; // pragma: allowlist secret
-      window.removeEventListener("beforeunload", handleBeforeUnload); // pragma: allowlist secret
-      clearInterval(intervalId); // pragma: allowlist secret
+    return () => { 
+      active = false; 
+      window.removeEventListener("beforeunload", handleBeforeUnload); 
+      clearInterval(intervalId); 
 
-      const currentSessionToken = sessionToken; // pragma: allowlist secret
-      sessionToken = null; // pragma: allowlist secret
-      roomToken = null; // pragma: allowlist secret
-      if (currentSessionToken) { // pragma: allowlist secret
-        void convex.mutation(api.videoPresence.disconnect, { // pragma: allowlist secret
-          sessionToken: currentSessionToken, // pragma: allowlist secret
-        }).catch(() => undefined); // pragma: allowlist secret
-      } // pragma: allowlist secret
-    }; // pragma: allowlist secret
-  }); // pragma: allowlist secret
+      const currentSessionToken = sessionToken; 
+      sessionToken = null; 
+      roomToken = null; 
+      if (currentSessionToken) { 
+        void convex.mutation(api.videoPresence.disconnect, { 
+          sessionToken: currentSessionToken, 
+        }).catch(() => undefined); 
+      } 
+    }; 
+  }); 
 
-  const handleTimeUpdate = () => { // pragma: allowlist secret
-    if (!videoElement) return; // pragma: allowlist secret
-    currentTime = videoElement.currentTime; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleTimeUpdate = () => { 
+    if (!videoElement) return; 
+    currentTime = videoElement.currentTime; 
+  }; 
 
-  const handleMarkerClick = (commentId: Id<"comments">) => { // pragma: allowlist secret
-    highlightedCommentId = commentId; // pragma: allowlist secret
-    setTimeout(() => { // pragma: allowlist secret
-      if (highlightedCommentId === commentId) { // pragma: allowlist secret
-        highlightedCommentId = undefined; // pragma: allowlist secret
-      } // pragma: allowlist secret
-    }, 3000); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleMarkerClick = (commentId: Id<"comments">) => { 
+    highlightedCommentId = commentId; 
+    setTimeout(() => { 
+      if (highlightedCommentId === commentId) { 
+        highlightedCommentId = undefined; 
+      } 
+    }, 3000); 
+  }; 
 
-  const requestDownload = async () => { // pragma: allowlist secret
-    if (!videoQuery.data || videoQuery.data.status !== "ready" || !resolvedVideoId) return null; // pragma: allowlist secret
-    return await convex.action(api.videoActions.getDownloadUrl, { // pragma: allowlist secret
-      videoId: resolvedVideoId, // pragma: allowlist secret
-    }); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const requestDownload = async () => { 
+    if (!videoQuery.data || videoQuery.data.status !== "ready" || !resolvedVideoId) return null; 
+    return await convex.action(api.videoActions.getDownloadUrl, { 
+      videoId: resolvedVideoId, 
+    }); 
+  }; 
 
-  const handleTimestampClick = (time: number) => { // pragma: allowlist secret
-    if (!videoElement) return; // pragma: allowlist secret
-    videoElement.currentTime = time; // pragma: allowlist secret
-    videoElement.play().catch(() => undefined); // pragma: allowlist secret
-    highlightedCommentId = undefined; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleTimestampClick = (time: number) => { 
+    if (!videoElement) return; 
+    videoElement.currentTime = time; 
+    videoElement.play().catch(() => undefined); 
+    highlightedCommentId = undefined; 
+  }; 
 
-  const handleSaveTitle = async () => { // pragma: allowlist secret
-    if (!editedTitle.trim() || !resolvedVideoId) return; // pragma: allowlist secret
-    await convex.mutation(api.videos.update, { // pragma: allowlist secret
-      videoId: resolvedVideoId, // pragma: allowlist secret
-      title: editedTitle.trim(), // pragma: allowlist secret
-    }); // pragma: allowlist secret
-    isEditingTitle = false; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleSaveTitle = async () => { 
+    if (!editedTitle.trim() || !resolvedVideoId) return; 
+    await convex.mutation(api.videos.update, { 
+      videoId: resolvedVideoId, 
+      title: editedTitle.trim(), 
+    }); 
+    isEditingTitle = false; 
+  }; 
 
-  const handleUpdateWorkflowStatus = async (workflowStatus: VideoWorkflowStatus) => { // pragma: allowlist secret
-    if (!resolvedVideoId) return; // pragma: allowlist secret
-    await convex.mutation(api.videos.updateWorkflowStatus, { // pragma: allowlist secret
-      videoId: resolvedVideoId, // pragma: allowlist secret
-      workflowStatus, // pragma: allowlist secret
-    }); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleUpdateWorkflowStatus = async (workflowStatus: VideoWorkflowStatus) => { 
+    if (!resolvedVideoId) return; 
+    await convex.mutation(api.videos.updateWorkflowStatus, { 
+      videoId: resolvedVideoId, 
+      workflowStatus, 
+    }); 
+  }; 
 
-  const handleRetryProcessing = async () => { // pragma: allowlist secret
-    if (!resolvedVideoId) return; // pragma: allowlist secret
-    isRetryingProcessing = true; // pragma: allowlist secret
-    try { // pragma: allowlist secret
-      await convex.action(api.videoActions.retryMuxProcessing, { // pragma: allowlist secret
-        videoId: resolvedVideoId, // pragma: allowlist secret
-      }); // pragma: allowlist secret
-    } finally { // pragma: allowlist secret
-      isRetryingProcessing = false; // pragma: allowlist secret
-    } // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleRetryProcessing = async () => { 
+    if (!resolvedVideoId) return; 
+    isRetryingProcessing = true; 
+    try { 
+      await convex.action(api.videoActions.retryMuxProcessing, { 
+        videoId: resolvedVideoId, 
+      }); 
+    } finally { 
+      isRetryingProcessing = false; 
+    } 
+  }; 
 
-  const startEditingTitle = () => { // pragma: allowlist secret
-    if (!videoQuery.data) return; // pragma: allowlist secret
-    editedTitle = videoQuery.data.title; // pragma: allowlist secret
-    isEditingTitle = true; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const startEditingTitle = () => { 
+    if (!videoQuery.data) return; 
+    editedTitle = videoQuery.data.title; 
+    isEditingTitle = true; 
+  }; 
 
-  const handleCreateComment = async () => { // pragma: allowlist secret
-    if (!resolvedVideoId || !commentText.trim()) return; // pragma: allowlist secret
-    await convex.mutation(api.comments.create, { // pragma: allowlist secret
-      videoId: resolvedVideoId, // pragma: allowlist secret
-      text: commentText.trim(), // pragma: allowlist secret
-      timestampSeconds: currentTime, // pragma: allowlist secret
-    }); // pragma: allowlist secret
-    commentText = ""; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleCreateComment = async () => { 
+    if (!resolvedVideoId || !commentText.trim()) return; 
+    await convex.mutation(api.comments.create, { 
+      videoId: resolvedVideoId, 
+      text: commentText.trim(), 
+      timestampSeconds: currentTime, 
+    }); 
+    commentText = ""; 
+  }; 
 
-  const handleDeleteComment = async (commentId: Id<"comments">) => { // pragma: allowlist secret
-    await convex.mutation(api.comments.remove, { // pragma: allowlist secret
-      commentId, // pragma: allowlist secret
-    }); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleDeleteComment = async (commentId: Id<"comments">) => { 
+    await convex.mutation(api.comments.remove, { 
+      commentId, 
+    }); 
+  }; 
 
-  const handleToggleResolved = async (commentId: Id<"comments">) => { // pragma: allowlist secret
-    await convex.mutation(api.comments.toggleResolved, { // pragma: allowlist secret
-      commentId, // pragma: allowlist secret
-    }); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleToggleResolved = async (commentId: Id<"comments">) => { 
+    await convex.mutation(api.comments.toggleResolved, { 
+      commentId, 
+    }); 
+  }; 
 
-  const canEdit = $derived(videoQuery.data?.role !== "viewer"); // pragma: allowlist secret
-  const canComment = $derived(Boolean(resolvedVideoId)); // pragma: allowlist secret
-  const canRetryProcessing = $derived(Boolean(canEdit && videoQuery.data?.s3Key)); // pragma: allowlist secret
+  const canEdit = $derived(videoQuery.data?.role !== "viewer"); 
+  const canComment = $derived(Boolean(resolvedVideoId)); 
+  const canRetryProcessing = $derived(Boolean(canEdit && videoQuery.data?.s3Key)); 
 
-  const commentsCount = $derived(commentsQuery.data?.length ?? 0); // pragma: allowlist secret
+  const commentsCount = $derived(commentsQuery.data?.length ?? 0); 
 
 </script>
 

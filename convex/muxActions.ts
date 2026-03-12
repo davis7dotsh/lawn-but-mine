@@ -1,9 +1,10 @@
 "use node";
 
 import { v } from "convex/values";
-import { internalAction, ActionCtx } from "./_generated/server";
+import { internalAction } from "./_generated/server";
+import type { ActionCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { Id } from "./_generated/dataModel";
+import type { Id } from "./_generated/dataModel";
 import {
   buildMuxThumbnailUrl,
   getMuxAsset,

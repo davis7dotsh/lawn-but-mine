@@ -1,71 +1,71 @@
-<script lang="ts">// pragma: allowlist secret
-  import { api } from "@convex/_generated/api"; // pragma: allowlist secret
-  import type { Id } from "@convex/_generated/dataModel"; // pragma: allowlist secret
-  import { useConvexClient, useQuery } from "convex-svelte"; // pragma: allowlist secret
-  import { Check, Copy, ExternalLink, Globe, Lock, Plus, Trash2, X, Eye } from "lucide-svelte"; // pragma: allowlist secret
-  import { formatRelativeTime } from "@/lib/utils"; // pragma: allowlist secret
+<script lang="ts">
+  import { api } from "@convex/_generated/api"; 
+  import type { Id } from "@convex/_generated/dataModel"; 
+  import { useConvexClient, useQuery } from "convex-svelte"; 
+  import { Check, Copy, ExternalLink, Globe, Lock, Plus, Trash2, X, Eye } from "lucide-svelte"; 
+  import { formatRelativeTime } from "@/lib/utils"; 
 
-  let { // pragma: allowlist secret
-    videoId, // pragma: allowlist secret
-    open, // pragma: allowlist secret
-    onOpenChange, // pragma: allowlist secret
-  }: { // pragma: allowlist secret
-    videoId: Id<"videos">; // pragma: allowlist secret
-    open: boolean; // pragma: allowlist secret
-    onOpenChange: (open: boolean) => void; // pragma: allowlist secret
-  } = $props(); // pragma: allowlist secret
+  let { 
+    videoId, 
+    open, 
+    onOpenChange, 
+  }: { 
+    videoId: Id<"videos">; 
+    open: boolean; 
+    onOpenChange: (open: boolean) => void; 
+  } = $props(); 
 
-  const convex = useConvexClient(); // pragma: allowlist secret
-  const videoQuery = useQuery(api.videos.get, () => (open ? { videoId } : "skip")); // pragma: allowlist secret
-  const shareLinksQuery = useQuery(api.shareLinks.list, () => (open ? { videoId } : "skip")); // pragma: allowlist secret
+  const convex = useConvexClient(); 
+  const videoQuery = useQuery(api.videos.get, () => (open ? { videoId } : "skip")); 
+  const shareLinksQuery = useQuery(api.shareLinks.list, () => (open ? { videoId } : "skip")); 
 
-  let isCreating = $state(false); // pragma: allowlist secret
-  let isUpdatingVisibility = $state(false); // pragma: allowlist secret
-  let copiedId = $state<string | null>(null); // pragma: allowlist secret
-  let expiresInDays = $state<string>("never"); // pragma: allowlist secret
-  let password = $state(""); // pragma: allowlist secret
+  let isCreating = $state(false); 
+  let isUpdatingVisibility = $state(false); 
+  let copiedId = $state<string | null>(null); 
+  let expiresInDays = $state<string>("never"); 
+  let password = $state(""); 
 
-  const copyText = async (text: string, id: string) => { // pragma: allowlist secret
-    await navigator.clipboard.writeText(text); // pragma: allowlist secret
-    copiedId = id; // pragma: allowlist secret
-    setTimeout(() => { // pragma: allowlist secret
-      copiedId = null; // pragma: allowlist secret
-    }, 2000); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const copyText = async (text: string, id: string) => { 
+    await navigator.clipboard.writeText(text); 
+    copiedId = id; 
+    setTimeout(() => { 
+      copiedId = null; 
+    }, 2000); 
+  }; 
 
-  const handleCreateLink = async () => { // pragma: allowlist secret
-    isCreating = true; // pragma: allowlist secret
-    try { // pragma: allowlist secret
-      await convex.mutation(api.shareLinks.create, { // pragma: allowlist secret
-        videoId, // pragma: allowlist secret
-        expiresInDays: expiresInDays === "never" ? undefined : Number(expiresInDays), // pragma: allowlist secret
-        allowDownload: false, // pragma: allowlist secret
-        password: password.trim() || undefined, // pragma: allowlist secret
-      }); // pragma: allowlist secret
-      expiresInDays = "never"; // pragma: allowlist secret
-      password = ""; // pragma: allowlist secret
-    } finally { // pragma: allowlist secret
-      isCreating = false; // pragma: allowlist secret
-    } // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleCreateLink = async () => { 
+    isCreating = true; 
+    try { 
+      await convex.mutation(api.shareLinks.create, { 
+        videoId, 
+        expiresInDays: expiresInDays === "never" ? undefined : Number(expiresInDays), 
+        allowDownload: false, 
+        password: password.trim() || undefined, 
+      }); 
+      expiresInDays = "never"; 
+      password = ""; 
+    } finally { 
+      isCreating = false; 
+    } 
+  }; 
 
-  const handleSetVisibility = async (visibility: "public" | "private") => { // pragma: allowlist secret
-    const video = videoQuery.data; // pragma: allowlist secret
-    if (!video || video.visibility === visibility || isUpdatingVisibility) return; // pragma: allowlist secret
-    isUpdatingVisibility = true; // pragma: allowlist secret
-    try { // pragma: allowlist secret
-      await convex.mutation(api.videos.setVisibility, { videoId, visibility }); // pragma: allowlist secret
-    } finally { // pragma: allowlist secret
-      isUpdatingVisibility = false; // pragma: allowlist secret
-    } // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleSetVisibility = async (visibility: "public" | "private") => { 
+    const video = videoQuery.data; 
+    if (!video || video.visibility === visibility || isUpdatingVisibility) return; 
+    isUpdatingVisibility = true; 
+    try { 
+      await convex.mutation(api.videos.setVisibility, { videoId, visibility }); 
+    } finally { 
+      isUpdatingVisibility = false; 
+    } 
+  }; 
 
-  const handleDeleteLink = async (linkId: Id<"shareLinks">) => { // pragma: allowlist secret
-    if (!window.confirm("Are you sure you want to delete this share link?")) return; // pragma: allowlist secret
-    await convex.mutation(api.shareLinks.remove, { linkId }); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleDeleteLink = async (linkId: Id<"shareLinks">) => { 
+    if (!window.confirm("Are you sure you want to delete this share link?")) return; 
+    await convex.mutation(api.shareLinks.remove, { linkId }); 
+  }; 
 
-  const publicWatchPath = $derived(videoQuery.data?.publicId ? `/watch/${videoQuery.data.publicId}` : null); // pragma: allowlist secret
+  const publicWatchPath = $derived(videoQuery.data?.publicId ? `/watch/${videoQuery.data.publicId}` : null); 
 </script>
 
 {#if open}

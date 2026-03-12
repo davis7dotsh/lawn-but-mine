@@ -1,212 +1,212 @@
-<script lang="ts">// pragma: allowlist secret
-  import { goto } from "$app/navigation"; // pragma: allowlist secret
-  import { browser } from "$app/environment"; // pragma: allowlist secret
-  import { page } from "$app/state"; // pragma: allowlist secret
-  import { api } from "@convex/_generated/api"; // pragma: allowlist secret
-  import { useConvexClient, useQuery } from "convex-svelte"; // pragma: allowlist secret
-  import { Check, CreditCard, Pencil, Trash2, X } from "lucide-svelte"; // pragma: allowlist secret
-  import DashboardHeader from "@/lib/components/DashboardHeader.svelte"; // pragma: allowlist secret
-  import MemberInvite from "@/lib/components/teams/MemberInvite.svelte"; // pragma: allowlist secret
-  import { makeRouteQuerySpec, prewarmSpecs } from "@/lib/convex/prewarm"; // pragma: allowlist secret
-  import { dashboardHomePath, teamHomePath } from "@/lib/routes"; // pragma: allowlist secret
-  import { // pragma: allowlist secret
-    TEAM_PLAN_LABELS, // pragma: allowlist secret
-    TEAM_PLAN_MONTHLY_PRICE_USD, // pragma: allowlist secret
-    TEAM_PLAN_SEATS, // pragma: allowlist secret
-    TEAM_PLAN_STORAGE_LIMIT_BYTES, // pragma: allowlist secret
-    TEAM_TRIAL_DAYS, // pragma: allowlist secret
-    normalizeTeamPlan, // pragma: allowlist secret
-    shouldRefreshBilling, // pragma: allowlist secret
-    type TeamPlan as BillingPlan, // pragma: allowlist secret
-  } from "@/shared/billingPlans"; // pragma: allowlist secret
+<script lang="ts">
+  import { goto } from "$app/navigation"; 
+  import { browser } from "$app/environment"; 
+  import { page } from "$app/state"; 
+  import { api } from "@convex/_generated/api"; 
+  import { useConvexClient, useQuery } from "convex-svelte"; 
+  import { Check, CreditCard, Pencil, Trash2, X } from "lucide-svelte"; 
+  import DashboardHeader from "@/lib/components/DashboardHeader.svelte"; 
+  import MemberInvite from "@/lib/components/teams/MemberInvite.svelte"; 
+  import { makeRouteQuerySpec, prewarmSpecs } from "@/lib/convex/prewarm"; 
+  import { dashboardHomePath, teamHomePath } from "@/lib/routes"; 
+  import { 
+    TEAM_PLAN_LABELS, 
+    TEAM_PLAN_MONTHLY_PRICE_USD, 
+    TEAM_PLAN_SEATS, 
+    TEAM_PLAN_STORAGE_LIMIT_BYTES, 
+    TEAM_TRIAL_DAYS, 
+    normalizeTeamPlan, 
+    shouldRefreshBilling, 
+    type TeamPlan as BillingPlan, 
+  } from "@/shared/billingPlans"; 
 
-  const GIBIBYTE = 1024 ** 3; // pragma: allowlist secret
-  const TEBIBYTE = 1024 ** 4; // pragma: allowlist secret
+  const GIBIBYTE = 1024 ** 3; 
+  const TEBIBYTE = 1024 ** 4; 
 
-  const BILLING_PLANS: Record< // pragma: allowlist secret
-    BillingPlan, // pragma: allowlist secret
-    { // pragma: allowlist secret
-      label: string; // pragma: allowlist secret
-      monthlyPriceUsd: number; // pragma: allowlist secret
-      storageLimitBytes: number; // pragma: allowlist secret
-      seats: string; // pragma: allowlist secret
-    } // pragma: allowlist secret
-  > = { // pragma: allowlist secret
-    basic: { // pragma: allowlist secret
-      label: TEAM_PLAN_LABELS.basic, // pragma: allowlist secret
-      monthlyPriceUsd: TEAM_PLAN_MONTHLY_PRICE_USD.basic, // pragma: allowlist secret
-      storageLimitBytes: TEAM_PLAN_STORAGE_LIMIT_BYTES.basic, // pragma: allowlist secret
-      seats: TEAM_PLAN_SEATS, // pragma: allowlist secret
-    }, // pragma: allowlist secret
-    pro: { // pragma: allowlist secret
-      label: TEAM_PLAN_LABELS.pro, // pragma: allowlist secret
-      monthlyPriceUsd: TEAM_PLAN_MONTHLY_PRICE_USD.pro, // pragma: allowlist secret
-      storageLimitBytes: TEAM_PLAN_STORAGE_LIMIT_BYTES.pro, // pragma: allowlist secret
-      seats: TEAM_PLAN_SEATS, // pragma: allowlist secret
-    }, // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const BILLING_PLANS: Record< 
+    BillingPlan, 
+    { 
+      label: string; 
+      monthlyPriceUsd: number; 
+      storageLimitBytes: number; 
+      seats: string; 
+    } 
+  > = { 
+    basic: { 
+      label: TEAM_PLAN_LABELS.basic, 
+      monthlyPriceUsd: TEAM_PLAN_MONTHLY_PRICE_USD.basic, 
+      storageLimitBytes: TEAM_PLAN_STORAGE_LIMIT_BYTES.basic, 
+      seats: TEAM_PLAN_SEATS, 
+    }, 
+    pro: { 
+      label: TEAM_PLAN_LABELS.pro, 
+      monthlyPriceUsd: TEAM_PLAN_MONTHLY_PRICE_USD.pro, 
+      storageLimitBytes: TEAM_PLAN_STORAGE_LIMIT_BYTES.pro, 
+      seats: TEAM_PLAN_SEATS, 
+    }, 
+  }; 
 
-  const convex = useConvexClient(); // pragma: allowlist secret
+  const convex = useConvexClient(); 
 
-  let isEditingName = $state(false); // pragma: allowlist secret
-  let editedName = $state(""); // pragma: allowlist secret
-  let memberDialogOpen = $state(false); // pragma: allowlist secret
-  let isCheckingOutPlan = $state<BillingPlan | null>(null); // pragma: allowlist secret
-  let isOpeningPortal = $state(false); // pragma: allowlist secret
-  let billingError = $state<string | null>(null); // pragma: allowlist secret
+  let isEditingName = $state(false); 
+  let editedName = $state(""); 
+  let memberDialogOpen = $state(false); 
+  let isCheckingOutPlan = $state<BillingPlan | null>(null); 
+  let isOpeningPortal = $state(false); 
+  let billingError = $state<string | null>(null); 
 
-  const teamSlug = $derived(page.params.teamSlug); // pragma: allowlist secret
-  const pathname = $derived(page.url.pathname); // pragma: allowlist secret
+  const teamSlug = $derived(page.params.teamSlug); 
+  const pathname = $derived(page.url.pathname); 
 
-  const contextQuery = useQuery(api.workspace.resolveContext, () => ({ // pragma: allowlist secret
-    teamSlug, // pragma: allowlist secret
-  })); // pragma: allowlist secret
-  const team = $derived(contextQuery.data?.team); // pragma: allowlist secret
-  const membersQuery = useQuery(api.teams.getMembers, () => (team ? { teamId: team._id } : "skip")); // pragma: allowlist secret
-  const billingQuery = useQuery(api.billing.getTeamBilling, () => (team ? { teamId: team._id } : "skip")); // pragma: allowlist secret
+  const contextQuery = useQuery(api.workspace.resolveContext, () => ({ 
+    teamSlug, 
+  })); 
+  const team = $derived(contextQuery.data?.team); 
+  const membersQuery = useQuery(api.teams.getMembers, () => (team ? { teamId: team._id } : "skip")); 
+  const billingQuery = useQuery(api.billing.getTeamBilling, () => (team ? { teamId: team._id } : "skip")); 
 
-  const prewarmTeam = (nextTeamSlug: string) => // pragma: allowlist secret
-    prewarmSpecs(convex, [makeRouteQuerySpec(api.workspace.resolveContext, { teamSlug: nextTeamSlug })]); // pragma: allowlist secret
+  const prewarmTeam = (nextTeamSlug: string) => 
+    prewarmSpecs(convex, [makeRouteQuerySpec(api.workspace.resolveContext, { teamSlug: nextTeamSlug })]); 
 
-  const canonicalSettingsPath = $derived(contextQuery.data ? `${contextQuery.data.canonicalPath}/settings` : null); // pragma: allowlist secret
-  const shouldCanonicalize = $derived( // pragma: allowlist secret
-    Boolean(canonicalSettingsPath && pathname.endsWith("/settings") && pathname !== canonicalSettingsPath), // pragma: allowlist secret
-  ); // pragma: allowlist secret
+  const canonicalSettingsPath = $derived(contextQuery.data ? `${contextQuery.data.canonicalPath}/settings` : null); 
+  const shouldCanonicalize = $derived( 
+    Boolean(canonicalSettingsPath && pathname.endsWith("/settings") && pathname !== canonicalSettingsPath), 
+  ); 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!browser || !shouldCanonicalize || !canonicalSettingsPath) return; // pragma: allowlist secret
-    void goto(canonicalSettingsPath, { // pragma: allowlist secret
-      replaceState: true, // pragma: allowlist secret
-      noScroll: true, // pragma: allowlist secret
-    }); // pragma: allowlist secret
-  }); // pragma: allowlist secret
+  $effect(() => { 
+    if (!browser || !shouldCanonicalize || !canonicalSettingsPath) return; 
+    void goto(canonicalSettingsPath, { 
+      replaceState: true, 
+      noScroll: true, 
+    }); 
+  }); 
 
-  $effect(() => { // pragma: allowlist secret
-    if (!team || billingQuery.data === undefined) return; // pragma: allowlist secret
+  $effect(() => { 
+    if (!team || billingQuery.data === undefined) return; 
 
-    const forceRefresh = // pragma: allowlist secret
-      page.url.searchParams.has("billing") && // pragma: allowlist secret
-      ["success", "cancel"].includes(page.url.searchParams.get("billing") || ""); // pragma: allowlist secret
+    const forceRefresh = 
+      page.url.searchParams.has("billing") && 
+      ["success", "cancel"].includes(page.url.searchParams.get("billing") || ""); 
 
-    if (!shouldRefreshBilling(billingQuery.data?.billingLastSyncedAt, forceRefresh)) { // pragma: allowlist secret
-      return; // pragma: allowlist secret
-    } // pragma: allowlist secret
+    if (!shouldRefreshBilling(billingQuery.data?.billingLastSyncedAt, forceRefresh)) { 
+      return; 
+    } 
 
-    void convex.action(api.billing.refreshTeamBilling, { // pragma: allowlist secret
-      teamId: team._id, // pragma: allowlist secret
-    }).catch(() => undefined); // pragma: allowlist secret
-  }); // pragma: allowlist secret
+    void convex.action(api.billing.refreshTeamBilling, { 
+      teamId: team._id, 
+    }).catch(() => undefined); 
+  }); 
 
-  const formatBytes = (bytes: number) => { // pragma: allowlist secret
-    if (bytes >= TEBIBYTE) return `${(bytes / TEBIBYTE).toFixed(1)} TB`; // pragma: allowlist secret
-    return `${(bytes / GIBIBYTE).toFixed(1)} GB`; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const formatBytes = (bytes: number) => { 
+    if (bytes >= TEBIBYTE) return `${(bytes / TEBIBYTE).toFixed(1)} TB`; 
+    return `${(bytes / GIBIBYTE).toFixed(1)} GB`; 
+  }; 
 
-  const formatUtcDateFromUnixSeconds = (unixSeconds: number) => // pragma: allowlist secret
-    new Date(unixSeconds * 1000).toISOString().slice(0, 10); // pragma: allowlist secret
+  const formatUtcDateFromUnixSeconds = (unixSeconds: number) => 
+    new Date(unixSeconds * 1000).toISOString().slice(0, 10); 
 
-  const handleSaveName = async () => { // pragma: allowlist secret
-    if (!editedName.trim() || !team) return; // pragma: allowlist secret
-    await convex.mutation(api.teams.update, { // pragma: allowlist secret
-      teamId: team._id, // pragma: allowlist secret
-      name: editedName.trim(), // pragma: allowlist secret
-    }); // pragma: allowlist secret
-    isEditingName = false; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleSaveName = async () => { 
+    if (!editedName.trim() || !team) return; 
+    await convex.mutation(api.teams.update, { 
+      teamId: team._id, 
+      name: editedName.trim(), 
+    }); 
+    isEditingName = false; 
+  }; 
 
-  const handleDeleteTeam = async () => { // pragma: allowlist secret
-    if (!team) return; // pragma: allowlist secret
+  const handleDeleteTeam = async () => { 
+    if (!team) return; 
 
-    if (billingQuery.data?.hasActiveSubscription) { // pragma: allowlist secret
-      billingError = "Cancel the team's active subscription in billing before deleting this team."; // pragma: allowlist secret
-      return; // pragma: allowlist secret
-    } // pragma: allowlist secret
+    if (billingQuery.data?.hasActiveSubscription) { 
+      billingError = "Cancel the team's active subscription in billing before deleting this team."; 
+      return; 
+    } 
 
-    if ( // pragma: allowlist secret
-      !window.confirm( // pragma: allowlist secret
-        "Are you sure you want to delete this team? This action cannot be undone and will delete all projects and videos.", // pragma: allowlist secret
-      ) // pragma: allowlist secret
-    ) { // pragma: allowlist secret
-      return; // pragma: allowlist secret
-    } // pragma: allowlist secret
+    if ( 
+      !window.confirm( 
+        "Are you sure you want to delete this team? This action cannot be undone and will delete all projects and videos.", 
+      ) 
+    ) { 
+      return; 
+    } 
 
-    if (!window.confirm(`Type the team name to confirm: ${team.name}`)) return; // pragma: allowlist secret
+    if (!window.confirm(`Type the team name to confirm: ${team.name}`)) return; 
 
-    await convex.mutation(api.teams.deleteTeam, { teamId: team._id }); // pragma: allowlist secret
-    await goto(dashboardHomePath()); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+    await convex.mutation(api.teams.deleteTeam, { teamId: team._id }); 
+    await goto(dashboardHomePath()); 
+  }; 
 
-  const handleStartCheckout = async (targetPlan: BillingPlan) => { // pragma: allowlist secret
-    if (!team) return; // pragma: allowlist secret
-    billingError = null; // pragma: allowlist secret
-    isCheckingOutPlan = targetPlan; // pragma: allowlist secret
+  const handleStartCheckout = async (targetPlan: BillingPlan) => { 
+    if (!team) return; 
+    billingError = null; 
+    isCheckingOutPlan = targetPlan; 
 
-    try { // pragma: allowlist secret
-      const settingsPath = canonicalSettingsPath ?? `/dashboard/${team.slug}/settings`; // pragma: allowlist secret
-      const successUrl = `${window.location.origin}${settingsPath}?billing=success`; // pragma: allowlist secret
-      const cancelUrl = `${window.location.origin}${settingsPath}?billing=cancel`; // pragma: allowlist secret
-      const session = await convex.action(api.billing.startCheckout, { // pragma: allowlist secret
-        teamId: team._id, // pragma: allowlist secret
-        plan: targetPlan, // pragma: allowlist secret
-        successUrl, // pragma: allowlist secret
-        cancelUrl, // pragma: allowlist secret
-      }); // pragma: allowlist secret
+    try { 
+      const settingsPath = canonicalSettingsPath ?? `/dashboard/${team.slug}/settings`; 
+      const successUrl = `${window.location.origin}${settingsPath}?billing=success`; 
+      const cancelUrl = `${window.location.origin}${settingsPath}?billing=cancel`; 
+      const session = await convex.action(api.billing.startCheckout, { 
+        teamId: team._id, 
+        plan: targetPlan, 
+        successUrl, 
+        cancelUrl, 
+      }); 
 
-      if (session.url) { // pragma: allowlist secret
-        window.location.assign(session.url); // pragma: allowlist secret
-        return; // pragma: allowlist secret
-      } // pragma: allowlist secret
+      if (session.url) { 
+        window.location.assign(session.url); 
+        return; 
+      } 
 
-      if (session.applied) { // pragma: allowlist secret
-        await convex.action(api.billing.refreshTeamBilling, { // pragma: allowlist secret
-          teamId: team._id, // pragma: allowlist secret
-        }); // pragma: allowlist secret
-        return; // pragma: allowlist secret
-      } // pragma: allowlist secret
+      if (session.applied) { 
+        await convex.action(api.billing.refreshTeamBilling, { 
+          teamId: team._id, 
+        }); 
+        return; 
+      } 
 
-      throw new Error("Billing checkout did not return a redirect URL."); // pragma: allowlist secret
-    } catch (error) { // pragma: allowlist secret
-      billingError = error instanceof Error ? error.message : "Unable to start checkout."; // pragma: allowlist secret
-    } finally { // pragma: allowlist secret
-      isCheckingOutPlan = null; // pragma: allowlist secret
-    } // pragma: allowlist secret
-  }; // pragma: allowlist secret
+      throw new Error("Billing checkout did not return a redirect URL."); 
+    } catch (error) { 
+      billingError = error instanceof Error ? error.message : "Unable to start checkout."; 
+    } finally { 
+      isCheckingOutPlan = null; 
+    } 
+  }; 
 
-  const handleOpenPortal = async () => { // pragma: allowlist secret
-    if (!team) return; // pragma: allowlist secret
-    billingError = null; // pragma: allowlist secret
-    isOpeningPortal = true; // pragma: allowlist secret
+  const handleOpenPortal = async () => { 
+    if (!team) return; 
+    billingError = null; 
+    isOpeningPortal = true; 
 
-    try { // pragma: allowlist secret
-      const settingsPath = canonicalSettingsPath ?? `/dashboard/${team.slug}/settings`; // pragma: allowlist secret
-      const returnUrl = `${window.location.origin}${settingsPath}`; // pragma: allowlist secret
-      const session = await convex.action(api.billing.openBillingPortal, { // pragma: allowlist secret
-        teamId: team._id, // pragma: allowlist secret
-        returnUrl, // pragma: allowlist secret
-      }); // pragma: allowlist secret
-      window.location.assign(session.url); // pragma: allowlist secret
-    } catch (error) { // pragma: allowlist secret
-      billingError = error instanceof Error ? error.message : "Unable to open billing portal."; // pragma: allowlist secret
-    } finally { // pragma: allowlist secret
-      isOpeningPortal = false; // pragma: allowlist secret
-    } // pragma: allowlist secret
-  }; // pragma: allowlist secret
+    try { 
+      const settingsPath = canonicalSettingsPath ?? `/dashboard/${team.slug}/settings`; 
+      const returnUrl = `${window.location.origin}${settingsPath}`; 
+      const session = await convex.action(api.billing.openBillingPortal, { 
+        teamId: team._id, 
+        returnUrl, 
+      }); 
+      window.location.assign(session.url); 
+    } catch (error) { 
+      billingError = error instanceof Error ? error.message : "Unable to open billing portal."; 
+    } finally { 
+      isOpeningPortal = false; 
+    } 
+  }; 
 
-  const isOwner = $derived(team?.role === "owner"); // pragma: allowlist secret
-  const isAdmin = $derived(team?.role === "owner" || team?.role === "admin"); // pragma: allowlist secret
-  const plan = $derived(billingQuery.data?.plan ?? normalizeTeamPlan(team?.plan ?? "basic")); // pragma: allowlist secret
-  const planConfig = $derived(BILLING_PLANS[plan]); // pragma: allowlist secret
-  const hasActiveSubscription = $derived(billingQuery.data?.hasActiveSubscription ?? false); // pragma: allowlist secret
-  const subscriptionStatus = $derived(billingQuery.data?.subscriptionStatus ?? "not_subscribed"); // pragma: allowlist secret
-  const isTrialing = $derived(subscriptionStatus === "trialing"); // pragma: allowlist secret
-  const hasPortalAccess = $derived(Boolean(isOwner && hasActiveSubscription)); // pragma: allowlist secret
-  const currentPlanLabel = $derived(hasActiveSubscription ? planConfig.label : "Unpaid"); // pragma: allowlist secret
-  const canDeleteTeam = $derived(Boolean(isOwner && !hasActiveSubscription)); // pragma: allowlist secret
-  const storageUsed = $derived(billingQuery.data?.storageUsedBytes ?? 0); // pragma: allowlist secret
-  const storageLimit = $derived(planConfig.storageLimitBytes); // pragma: allowlist secret
-  const storagePct = $derived( // pragma: allowlist secret
-    storageLimit > 0 ? Math.min((storageUsed / storageLimit) * 100, 100) : 0, // pragma: allowlist secret
-  ); // pragma: allowlist secret
+  const isOwner = $derived(team?.role === "owner"); 
+  const isAdmin = $derived(team?.role === "owner" || team?.role === "admin"); 
+  const plan = $derived(billingQuery.data?.plan ?? normalizeTeamPlan(team?.plan ?? "basic")); 
+  const planConfig = $derived(BILLING_PLANS[plan]); 
+  const hasActiveSubscription = $derived(billingQuery.data?.hasActiveSubscription ?? false); 
+  const subscriptionStatus = $derived(billingQuery.data?.subscriptionStatus ?? "not_subscribed"); 
+  const isTrialing = $derived(subscriptionStatus === "trialing"); 
+  const hasPortalAccess = $derived(Boolean(isOwner && hasActiveSubscription)); 
+  const currentPlanLabel = $derived(hasActiveSubscription ? planConfig.label : "Unpaid"); 
+  const canDeleteTeam = $derived(Boolean(isOwner && !hasActiveSubscription)); 
+  const storageUsed = $derived(billingQuery.data?.storageUsedBytes ?? 0); 
+  const storageLimit = $derived(planConfig.storageLimitBytes); 
+  const storagePct = $derived( 
+    storageLimit > 0 ? Math.min((storageUsed / storageLimit) * 100, 100) : 0, 
+  ); 
 </script>
 
 {#if contextQuery.data === undefined || shouldCanonicalize}

@@ -1,8 +1,6 @@
 import { browser } from "$app/environment";
-import { Clerk } from "@clerk/clerk-js";
+import type { Clerk as ClerkClient } from "@clerk/clerk-js";
 import type { ConvexClient } from "convex/browser";
-
-type ClerkClient = Clerk;
 
 export const clerkAppearance = {
   elements: {
@@ -75,10 +73,19 @@ export async function initClerk() {
 
   if (!initPromise) {
     initPromise = (async () => {
+      const [{ Clerk }, { ClerkUI }] = await Promise.all([
+        import("@clerk/clerk-js"),
+        import("@clerk/ui/entry"),
+      ]);
+
       const clerk = new Clerk(publishableKey);
+
       await clerk.load({
         signInUrl: "/sign-in",
         signUpUrl: "/sign-up",
+        ui: {
+          ClerkUI,
+        },
       });
 
       syncState(clerk);
@@ -100,9 +107,12 @@ export async function bindConvexAuth(client: ConvexClient) {
   const clerk = await initClerk();
   if (!clerk) return;
 
-  client.setAuth(async () => {
+  client.setAuth(async ({ forceRefreshToken }) => {
     if (!clerk.session) return null;
-    return clerk.session.getToken({ template: "convex" });
+    return clerk.session.getToken({
+      template: "convex",
+      skipCache: forceRefreshToken,
+    });
   });
 
   boundClients.add(client);

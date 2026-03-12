@@ -1,184 +1,184 @@
-// pragma: allowlist secret
-import { useConvexClient } from "convex-svelte"; // pragma: allowlist secret
-import { api } from "@convex/_generated/api"; // pragma: allowlist secret
-import type { Id } from "@convex/_generated/dataModel"; // pragma: allowlist secret
-import type { ManagedUploadItem } from "@/lib/dashboardUploadContext.svelte"; // pragma: allowlist secret
 
-function createUploadId() { // pragma: allowlist secret
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") { // pragma: allowlist secret
-    return crypto.randomUUID(); // pragma: allowlist secret
-  } // pragma: allowlist secret
-  return Math.random().toString(36).slice(2); // pragma: allowlist secret
-} // pragma: allowlist secret
+import { useConvexClient } from "convex-svelte"; 
+import { api } from "@convex/_generated/api"; 
+import type { Id } from "@convex/_generated/dataModel"; 
+import type { ManagedUploadItem } from "@/lib/dashboardUploadContext.svelte"; 
 
-export function useVideoUploadManager() { // pragma: allowlist secret
-  const convex = useConvexClient(); // pragma: allowlist secret
-  let uploads = $state<ManagedUploadItem[]>([]); // pragma: allowlist secret
+function createUploadId() { 
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") { 
+    return crypto.randomUUID(); 
+  } 
+  return Math.random().toString(36).slice(2); 
+} 
 
-  const updateUpload = (uploadId: string, updater: (upload: ManagedUploadItem) => ManagedUploadItem) => { // pragma: allowlist secret
-    uploads = uploads.map((upload) => (upload.id === uploadId ? updater(upload) : upload)); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+export function useVideoUploadManager() { 
+  const convex = useConvexClient(); 
+  let uploads = $state<ManagedUploadItem[]>([]); 
 
-  const uploadFilesToProject = async (projectId: Id<"projects">, files: File[]) => { // pragma: allowlist secret
-    for (const file of files) { // pragma: allowlist secret
-      const uploadId = createUploadId(); // pragma: allowlist secret
-      const abortController = new AbortController(); // pragma: allowlist secret
-      const title = file.name.replace(/\.[^/.]+$/, ""); // pragma: allowlist secret
+  const updateUpload = (uploadId: string, updater: (upload: ManagedUploadItem) => ManagedUploadItem) => { 
+    uploads = uploads.map((upload) => (upload.id === uploadId ? updater(upload) : upload)); 
+  }; 
 
-      uploads = [ // pragma: allowlist secret
-        ...uploads, // pragma: allowlist secret
-        { // pragma: allowlist secret
-          id: uploadId, // pragma: allowlist secret
-          projectId, // pragma: allowlist secret
-          file, // pragma: allowlist secret
-          progress: 0, // pragma: allowlist secret
-          status: "pending", // pragma: allowlist secret
-          abortController, // pragma: allowlist secret
-        }, // pragma: allowlist secret
-      ]; // pragma: allowlist secret
+  const uploadFilesToProject = async (projectId: Id<"projects">, files: File[]) => { 
+    for (const file of files) { 
+      const uploadId = createUploadId(); 
+      const abortController = new AbortController(); 
+      const title = file.name.replace(/\.[^/.]+$/, ""); 
 
-      let createdVideoId: Id<"videos"> | undefined; // pragma: allowlist secret
+      uploads = [ 
+        ...uploads, 
+        { 
+          id: uploadId, 
+          projectId, 
+          file, 
+          progress: 0, 
+          status: "pending", 
+          abortController, 
+        }, 
+      ]; 
 
-      try { // pragma: allowlist secret
-        createdVideoId = await convex.mutation(api.videos.create, { // pragma: allowlist secret
-          projectId, // pragma: allowlist secret
-          title, // pragma: allowlist secret
-          fileSize: file.size, // pragma: allowlist secret
-          contentType: file.type || "video/mp4", // pragma: allowlist secret
-        }); // pragma: allowlist secret
+      let createdVideoId: Id<"videos"> | undefined; 
 
-        updateUpload(uploadId, (upload) => ({ // pragma: allowlist secret
-          ...upload, // pragma: allowlist secret
-          videoId: createdVideoId, // pragma: allowlist secret
-          status: "uploading", // pragma: allowlist secret
-        })); // pragma: allowlist secret
+      try { 
+        createdVideoId = await convex.mutation(api.videos.create, { 
+          projectId, 
+          title, 
+          fileSize: file.size, 
+          contentType: file.type || "video/mp4", 
+        }); 
 
-        const { url } = await convex.action(api.videoActions.getUploadUrl, { // pragma: allowlist secret
-          videoId: createdVideoId, // pragma: allowlist secret
-          filename: file.name, // pragma: allowlist secret
-          fileSize: file.size, // pragma: allowlist secret
-          contentType: file.type || "video/mp4", // pragma: allowlist secret
-        }); // pragma: allowlist secret
+        updateUpload(uploadId, (upload) => ({ 
+          ...upload, 
+          videoId: createdVideoId, 
+          status: "uploading", 
+        })); 
 
-        await new Promise<void>((resolve, reject) => { // pragma: allowlist secret
-          const xhr = new XMLHttpRequest(); // pragma: allowlist secret
-          let lastTime = Date.now(); // pragma: allowlist secret
-          let lastLoaded = 0; // pragma: allowlist secret
-          const recentSpeeds: number[] = []; // pragma: allowlist secret
+        const { url } = await convex.action(api.videoActions.getUploadUrl, { 
+          videoId: createdVideoId, 
+          filename: file.name, 
+          fileSize: file.size, 
+          contentType: file.type || "video/mp4", 
+        }); 
 
-          xhr.upload.addEventListener("progress", (event) => { // pragma: allowlist secret
-            if (!event.lengthComputable) return; // pragma: allowlist secret
+        await new Promise<void>((resolve, reject) => { 
+          const xhr = new XMLHttpRequest(); 
+          let lastTime = Date.now(); 
+          let lastLoaded = 0; 
+          const recentSpeeds: number[] = []; 
 
-            const percentage = Math.round((event.loaded / event.total) * 100); // pragma: allowlist secret
-            const now = Date.now(); // pragma: allowlist secret
-            const timeDelta = (now - lastTime) / 1000; // pragma: allowlist secret
-            const bytesDelta = event.loaded - lastLoaded; // pragma: allowlist secret
+          xhr.upload.addEventListener("progress", (event) => { 
+            if (!event.lengthComputable) return; 
 
-            if (timeDelta > 0.1) { // pragma: allowlist secret
-              const speed = bytesDelta / timeDelta; // pragma: allowlist secret
-              recentSpeeds.push(speed); // pragma: allowlist secret
-              if (recentSpeeds.length > 5) { // pragma: allowlist secret
-                recentSpeeds.shift(); // pragma: allowlist secret
-              } // pragma: allowlist secret
-              lastTime = now; // pragma: allowlist secret
-              lastLoaded = event.loaded; // pragma: allowlist secret
-            } // pragma: allowlist secret
+            const percentage = Math.round((event.loaded / event.total) * 100); 
+            const now = Date.now(); 
+            const timeDelta = (now - lastTime) / 1000; 
+            const bytesDelta = event.loaded - lastLoaded; 
 
-            const avgSpeed = // pragma: allowlist secret
-              recentSpeeds.length > 0 // pragma: allowlist secret
-                ? recentSpeeds.reduce((sum, speed) => sum + speed, 0) / recentSpeeds.length // pragma: allowlist secret
-                : 0; // pragma: allowlist secret
-            const remaining = event.total - event.loaded; // pragma: allowlist secret
-            const eta = avgSpeed > 0 ? Math.ceil(remaining / avgSpeed) : null; // pragma: allowlist secret
+            if (timeDelta > 0.1) { 
+              const speed = bytesDelta / timeDelta; 
+              recentSpeeds.push(speed); 
+              if (recentSpeeds.length > 5) { 
+                recentSpeeds.shift(); 
+              } 
+              lastTime = now; 
+              lastLoaded = event.loaded; 
+            } 
 
-            updateUpload(uploadId, (upload) => ({ // pragma: allowlist secret
-              ...upload, // pragma: allowlist secret
-              progress: percentage, // pragma: allowlist secret
-              bytesPerSecond: avgSpeed, // pragma: allowlist secret
-              estimatedSecondsRemaining: eta, // pragma: allowlist secret
-            })); // pragma: allowlist secret
-          }); // pragma: allowlist secret
+            const avgSpeed = 
+              recentSpeeds.length > 0 
+                ? recentSpeeds.reduce((sum, speed) => sum + speed, 0) / recentSpeeds.length 
+                : 0; 
+            const remaining = event.total - event.loaded; 
+            const eta = avgSpeed > 0 ? Math.ceil(remaining / avgSpeed) : null; 
 
-          xhr.addEventListener("load", () => { // pragma: allowlist secret
-            if (xhr.status >= 200 && xhr.status < 300) { // pragma: allowlist secret
-              resolve(); // pragma: allowlist secret
-              return; // pragma: allowlist secret
-            } // pragma: allowlist secret
-            reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`)); // pragma: allowlist secret
-          }); // pragma: allowlist secret
+            updateUpload(uploadId, (upload) => ({ 
+              ...upload, 
+              progress: percentage, 
+              bytesPerSecond: avgSpeed, 
+              estimatedSecondsRemaining: eta, 
+            })); 
+          }); 
 
-          xhr.addEventListener("error", () => { // pragma: allowlist secret
-            reject(new Error("Upload failed: Network error")); // pragma: allowlist secret
-          }); // pragma: allowlist secret
+          xhr.addEventListener("load", () => { 
+            if (xhr.status >= 200 && xhr.status < 300) { 
+              resolve(); 
+              return; 
+            } 
+            reject(new Error(`Upload failed: ${xhr.status} ${xhr.statusText}`)); 
+          }); 
 
-          xhr.addEventListener("abort", () => { // pragma: allowlist secret
-            reject(new Error("Upload cancelled")); // pragma: allowlist secret
-          }); // pragma: allowlist secret
+          xhr.addEventListener("error", () => { 
+            reject(new Error("Upload failed: Network error")); 
+          }); 
 
-          abortController.signal.addEventListener("abort", () => { // pragma: allowlist secret
-            xhr.abort(); // pragma: allowlist secret
-          }); // pragma: allowlist secret
+          xhr.addEventListener("abort", () => { 
+            reject(new Error("Upload cancelled")); 
+          }); 
 
-          xhr.open("PUT", url); // pragma: allowlist secret
-          xhr.setRequestHeader("Content-Type", file.type || "video/mp4"); // pragma: allowlist secret
-          xhr.send(file); // pragma: allowlist secret
-        }); // pragma: allowlist secret
+          abortController.signal.addEventListener("abort", () => { 
+            xhr.abort(); 
+          }); 
 
-        updateUpload(uploadId, (upload) => ({ // pragma: allowlist secret
-          ...upload, // pragma: allowlist secret
-          status: "processing", // pragma: allowlist secret
-          progress: 100, // pragma: allowlist secret
-        })); // pragma: allowlist secret
+          xhr.open("PUT", url); 
+          xhr.setRequestHeader("Content-Type", file.type || "video/mp4"); 
+          xhr.send(file); 
+        }); 
 
-        await convex.action(api.videoActions.markUploadComplete, { // pragma: allowlist secret
-          videoId: createdVideoId, // pragma: allowlist secret
-        }); // pragma: allowlist secret
+        updateUpload(uploadId, (upload) => ({ 
+          ...upload, 
+          status: "processing", 
+          progress: 100, 
+        })); 
 
-        updateUpload(uploadId, (upload) => ({ // pragma: allowlist secret
-          ...upload, // pragma: allowlist secret
-          status: "complete", // pragma: allowlist secret
-          progress: 100, // pragma: allowlist secret
-        })); // pragma: allowlist secret
+        await convex.action(api.videoActions.markUploadComplete, { 
+          videoId: createdVideoId, 
+        }); 
 
-        setTimeout(() => { // pragma: allowlist secret
-          uploads = uploads.filter((upload) => upload.id !== uploadId); // pragma: allowlist secret
-        }, 3000); // pragma: allowlist secret
-      } catch (error) { // pragma: allowlist secret
-        const errorMessage = error instanceof Error ? error.message : "Upload failed"; // pragma: allowlist secret
+        updateUpload(uploadId, (upload) => ({ 
+          ...upload, 
+          status: "complete", 
+          progress: 100, 
+        })); 
 
-        updateUpload(uploadId, (upload) => ({ // pragma: allowlist secret
-          ...upload, // pragma: allowlist secret
-          status: "error", // pragma: allowlist secret
-          error: errorMessage, // pragma: allowlist secret
-        })); // pragma: allowlist secret
+        setTimeout(() => { 
+          uploads = uploads.filter((upload) => upload.id !== uploadId); 
+        }, 3000); 
+      } catch (error) { 
+        const errorMessage = error instanceof Error ? error.message : "Upload failed"; 
 
-        if (createdVideoId) { // pragma: allowlist secret
-          void convex.action(api.videoActions.markUploadFailed, { // pragma: allowlist secret
-            videoId: createdVideoId, // pragma: allowlist secret
-          }).catch(() => undefined); // pragma: allowlist secret
-        } // pragma: allowlist secret
-      } // pragma: allowlist secret
-    } // pragma: allowlist secret
-  }; // pragma: allowlist secret
+        updateUpload(uploadId, (upload) => ({ 
+          ...upload, 
+          status: "error", 
+          error: errorMessage, 
+        })); 
 
-  const cancelUpload = (uploadId: string) => { // pragma: allowlist secret
-    const upload = uploads.find((item) => item.id === uploadId); // pragma: allowlist secret
-    upload?.abortController?.abort(); // pragma: allowlist secret
+        if (createdVideoId) { 
+          void convex.action(api.videoActions.markUploadFailed, { 
+            videoId: createdVideoId, 
+          }).catch(() => undefined); 
+        } 
+      } 
+    } 
+  }; 
 
-    if (upload?.videoId) { // pragma: allowlist secret
-      void convex.action(api.videoActions.markUploadFailed, { // pragma: allowlist secret
-        videoId: upload.videoId, // pragma: allowlist secret
-      }).catch(() => undefined); // pragma: allowlist secret
-    } // pragma: allowlist secret
+  const cancelUpload = (uploadId: string) => { 
+    const upload = uploads.find((item) => item.id === uploadId); 
+    upload?.abortController?.abort(); 
 
-    uploads = uploads.filter((item) => item.id !== uploadId); // pragma: allowlist secret
-  }; // pragma: allowlist secret
+    if (upload?.videoId) { 
+      void convex.action(api.videoActions.markUploadFailed, { 
+        videoId: upload.videoId, 
+      }).catch(() => undefined); 
+    } 
 
-  return { // pragma: allowlist secret
-    get uploads() { // pragma: allowlist secret
-      return uploads; // pragma: allowlist secret
-    }, // pragma: allowlist secret
-    uploadFilesToProject, // pragma: allowlist secret
-    cancelUpload, // pragma: allowlist secret
-  }; // pragma: allowlist secret
-} // pragma: allowlist secret
+    uploads = uploads.filter((item) => item.id !== uploadId); 
+  }; 
+
+  return { 
+    get uploads() { 
+      return uploads; 
+    }, 
+    uploadFilesToProject, 
+    cancelUpload, 
+  }; 
+} 

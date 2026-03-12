@@ -1,26 +1,26 @@
-<script lang="ts">// pragma: allowlist secret
-  import type { Snippet } from "svelte"; // pragma: allowlist secret
-  import { Plus } from "lucide-svelte"; // pragma: allowlist secret
+<script lang="ts">
+  import type { Snippet } from "svelte"; 
+  import { Plus } from "lucide-svelte"; 
 
-  let { // pragma: allowlist secret
-    onFilesSelected, // pragma: allowlist secret
-    disabled = false, // pragma: allowlist secret
-    children, // pragma: allowlist secret
-  }: { // pragma: allowlist secret
-    onFilesSelected: (files: File[]) => void; // pragma: allowlist secret
-    disabled?: boolean; // pragma: allowlist secret
-    children?: Snippet; // pragma: allowlist secret
-  } = $props(); // pragma: allowlist secret
+  let { 
+    onFilesSelected, 
+    disabled = false, 
+    children, 
+  }: { 
+    onFilesSelected: (files: File[]) => void; 
+    disabled?: boolean; 
+    children?: Snippet; 
+  } = $props(); 
 
-  let input: HTMLInputElement | null = null; // pragma: allowlist secret
+  let input: HTMLInputElement | null = null; 
 
-  const handleChange = (event: Event) => { // pragma: allowlist secret
-    const files = Array.from((event.currentTarget as HTMLInputElement).files ?? []); // pragma: allowlist secret
-    if (files.length > 0) { // pragma: allowlist secret
-      onFilesSelected(files); // pragma: allowlist secret
-    } // pragma: allowlist secret
-    (event.currentTarget as HTMLInputElement).value = ""; // pragma: allowlist secret
-  }; // pragma: allowlist secret
+  const handleChange = (event: Event) => { 
+    const files = Array.from((event.currentTarget as HTMLInputElement).files ?? []); 
+    if (files.length > 0) { 
+      onFilesSelected(files); 
+    } 
+    (event.currentTarget as HTMLInputElement).value = ""; 
+  }; 
 </script>
 
 <input
