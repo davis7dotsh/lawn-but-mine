@@ -16,9 +16,9 @@
     TEAM_PLAN_STORAGE_LIMIT_BYTES, 
     TEAM_TRIAL_DAYS, 
     normalizeTeamPlan, 
-    shouldRefreshBilling, 
     type TeamPlan as BillingPlan, 
   } from "@/shared/billingPlans"; 
+  import { refreshTeamBillingIfNeeded, withoutBillingSearchParam } from "@/shared/billingRefresh"; 
 
   const GIBIBYTE = 1024 ** 3; 
   const TEBIBYTE = 1024 ** 4; 
@@ -82,18 +82,23 @@
   }); 
 
   $effect(() => { 
-    if (!team || billingQuery.data === undefined) return; 
+    if (!browser || !team || billingQuery.data === undefined) return; 
 
-    const forceRefresh = 
-      page.url.searchParams.has("billing") && 
-      ["success", "cancel"].includes(page.url.searchParams.get("billing") || ""); 
-
-    if (!shouldRefreshBilling(billingQuery.data?.billingLastSyncedAt, forceRefresh)) { 
-      return; 
-    } 
-
-    void convex.action(api.billing.refreshTeamBilling, { 
+    void refreshTeamBillingIfNeeded({ 
       teamId: team._id, 
+      billingLastSyncedAt: billingQuery.data.billingLastSyncedAt, 
+      search: page.url.search, 
+      refresh: () => convex.action(api.billing.refreshTeamBilling, { 
+        teamId: team._id, 
+      }), 
+      onForceRefreshHandled: () => { 
+        const nextSearch = withoutBillingSearchParam(page.url.search); 
+        window.history.replaceState( 
+          window.history.state, 
+          "", 
+          `${page.url.pathname}${nextSearch}${page.url.hash}`, 
+        ); 
+      }, 
     }).catch(() => undefined); 
   }); 
 

@@ -304,23 +304,12 @@ export const applyBillingSnapshot = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const team = await ctx.db.get(args.teamId);
-
-    if (!team) {
-      throw new Error("Team not found");
-    }
-
-    await ctx.db.replace(args.teamId, {
-      name: team.name,
-      slug: team.slug,
-      ownerClerkId: team.ownerClerkId,
+    await ctx.db.patch(args.teamId, {
       plan: args.plan,
       billingStatus: args.billingStatus,
+      billingProductId: args.billingProductId,
+      billingCurrentPeriodEnd: args.billingCurrentPeriodEnd,
       billingLastSyncedAt: args.billingLastSyncedAt,
-      ...(args.billingProductId ? { billingProductId: args.billingProductId } : {}),
-      ...(typeof args.billingCurrentPeriodEnd === "number"
-        ? { billingCurrentPeriodEnd: args.billingCurrentPeriodEnd }
-        : {}),
     });
 
     return null;

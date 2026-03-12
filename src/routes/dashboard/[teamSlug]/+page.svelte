@@ -10,7 +10,7 @@
   import MemberInvite from "@/lib/components/teams/MemberInvite.svelte"; 
   import { makeRouteQuerySpec, prewarmIntent, prewarmSpecs } from "@/lib/convex/prewarm"; 
   import { projectPath, teamSettingsPath } from "@/lib/routes"; 
-  import { shouldRefreshBilling } from "@/shared/billingPlans"; 
+  import { refreshTeamBillingIfNeeded, withoutBillingSearchParam } from "@/shared/billingRefresh"; 
 
   const convex = useConvexClient(); 
 
@@ -61,18 +61,23 @@
   }); 
 
   $effect(() => { 
-    if (!team || billingQuery.data === undefined) return; 
+    if (!browser || !team || billingQuery.data === undefined) return; 
 
-    const forceRefresh = 
-      page.url.searchParams.has("billing") && 
-      ["success", "cancel"].includes(page.url.searchParams.get("billing") || ""); 
-
-    if (!shouldRefreshBilling(billingQuery.data?.billingLastSyncedAt, forceRefresh)) { 
-      return; 
-    } 
-
-    void convex.action(api.billing.refreshTeamBilling, { 
+    void refreshTeamBillingIfNeeded({ 
       teamId: team._id, 
+      billingLastSyncedAt: billingQuery.data.billingLastSyncedAt, 
+      search: page.url.search, 
+      refresh: () => convex.action(api.billing.refreshTeamBilling, { 
+        teamId: team._id, 
+      }), 
+      onForceRefreshHandled: () => { 
+        const nextSearch = withoutBillingSearchParam(page.url.search); 
+        window.history.replaceState( 
+          window.history.state, 
+          "", 
+          `${page.url.pathname}${nextSearch}${page.url.hash}`, 
+        ); 
+      }, 
     }).catch(() => undefined); 
   }); 
 

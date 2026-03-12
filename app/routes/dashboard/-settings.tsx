@@ -19,9 +19,12 @@ import {
   TEAM_PLAN_STORAGE_LIMIT_BYTES,
   TEAM_TRIAL_DAYS,
   normalizeTeamPlan,
-  shouldRefreshBilling,
   type TeamPlan as BillingPlan,
 } from "@/shared/billingPlans";
+import {
+  refreshTeamBillingIfNeeded,
+  withoutBillingSearchParam,
+} from "@/shared/billingRefresh";
 
 const GIBIBYTE = 1024 ** 3;
 const TEBIBYTE = 1024 ** 4;
@@ -97,17 +100,21 @@ export default function TeamSettingsPage() {
   }, [shouldCanonicalize, canonicalSettingsPath, navigate]);
 
   useEffect(() => {
-    if (!team || billing === undefined) return;
-
-    const search = typeof window === "undefined" ? "" : window.location.search;
-    const forceRefresh =
-      search.includes("billing=success") || search.includes("billing=cancel");
-
-    if (!shouldRefreshBilling(billing?.billingLastSyncedAt, forceRefresh)) {
+    if (!team || billing === undefined || typeof window === "undefined") {
       return;
     }
 
-    void refreshTeamBilling({ teamId: team._id }).catch((error) => {
+    void refreshTeamBillingIfNeeded({
+      teamId: team._id,
+      billingLastSyncedAt: billing.billingLastSyncedAt,
+      search: window.location.search,
+      refresh: () => refreshTeamBilling({ teamId: team._id }),
+      onForceRefreshHandled: () => {
+        const nextSearch = withoutBillingSearchParam(window.location.search);
+        const nextUrl = `${window.location.pathname}${nextSearch}${window.location.hash}`;
+        window.history.replaceState(window.history.state, "", nextUrl);
+      },
+    }).catch((error) => {
       console.warn("Billing refresh failed", error);
     });
   }, [billing, refreshTeamBilling, team]);

@@ -34,7 +34,10 @@ import { useRoutePrewarmIntent } from "@/lib/useRoutePrewarmIntent";
 import { prewarmProject } from "./-project.data";
 import { useTeamData } from "./-team.data";
 import { DashboardHeader } from "@/components/DashboardHeader";
-import { shouldRefreshBilling } from "@/shared/billingPlans";
+import {
+  refreshTeamBillingIfNeeded,
+  withoutBillingSearchParam,
+} from "@/shared/billingRefresh";
 
 type TeamProjectCardProps = {
   teamSlug: string;
@@ -141,17 +144,21 @@ export default function TeamPage() {
   }, [shouldCanonicalize, context, navigate]);
 
   useEffect(() => {
-    if (!team || billing === undefined) return;
-
-    const search = typeof window === "undefined" ? "" : window.location.search;
-    const forceRefresh =
-      search.includes("billing=success") || search.includes("billing=cancel");
-
-    if (!shouldRefreshBilling(billing?.billingLastSyncedAt, forceRefresh)) {
+    if (!team || billing === undefined || typeof window === "undefined") {
       return;
     }
 
-    void refreshTeamBilling({ teamId: team._id }).catch((error) => {
+    void refreshTeamBillingIfNeeded({
+      teamId: team._id,
+      billingLastSyncedAt: billing.billingLastSyncedAt,
+      search: window.location.search,
+      refresh: () => refreshTeamBilling({ teamId: team._id }),
+      onForceRefreshHandled: () => {
+        const nextSearch = withoutBillingSearchParam(window.location.search);
+        const nextUrl = `${window.location.pathname}${nextSearch}${window.location.hash}`;
+        window.history.replaceState(window.history.state, "", nextUrl);
+      },
+    }).catch((error) => {
       console.warn("Billing refresh failed", error);
     });
   }, [billing, refreshTeamBilling, team]);
