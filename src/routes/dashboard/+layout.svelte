@@ -180,7 +180,7 @@
   </div>
 {:else}
   <div class="relative h-full flex flex-col bg-[#f0f0e8]">
-    <main class="flex-1 overflow-auto flex flex-col">
+    <main class="flex-1 overflow-hidden flex flex-col">
       <slot />
     </main>
 

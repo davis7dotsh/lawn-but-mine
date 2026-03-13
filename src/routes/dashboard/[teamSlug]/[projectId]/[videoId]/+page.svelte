@@ -606,10 +606,10 @@
         {/if}
 
         {#if activePlaybackUrl}
-          <div class="flex h-full flex-col">
+          <div class="flex flex-1 min-h-0 flex-col">
             <video
               bind:this={videoElement}
-              class="h-full w-full flex-1 bg-black"
+              class="w-full flex-1 min-h-0 bg-black object-contain"
               src={activePlaybackUrl}
               poster={playbackSession?.posterUrl}
               controls
@@ -617,7 +617,7 @@
               on:timeupdate={handleTimeUpdate}
             ></video>
 
-            <div class="flex flex-wrap items-center gap-2 border-t border-white/10 bg-black px-4 py-3 text-sm text-white/80">
+            <div class="flex-shrink-0 flex flex-wrap items-center gap-2 border-t border-white/10 bg-black px-4 py-3 text-sm text-white/80">
               <span class="font-semibold">Playback</span>
               <button
                 type="button"
