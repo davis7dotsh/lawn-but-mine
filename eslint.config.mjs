@@ -8,12 +8,13 @@ export default tseslint.config(
   ...svelte.configs.recommended,
   {
     ignores: [
-      "node_modules/**",
-      ".svelte-kit/**",
-      "build/**",
-      "dist/**",
-      "convex/_generated/**",
-      "coverage/**",
+      "**/node_modules/**",
+      "**/.svelte-kit/**",
+      "**/build/**",
+      "**/dist/**",
+      "**/.convex/**",
+      "**/coverage/**",
+      "packages/convex/convex/_generated/**",
     ],
   },
   {
