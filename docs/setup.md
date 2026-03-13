@@ -38,8 +38,12 @@ bun run start
 ## Quality checks
 
 ```bash
-bun run typecheck
-bun run lint
+bun run check:web
+bun run check:convex
+bun run check:autumn
+bun run check:shared
+bun run check:all
+bun run format:all
 ```
 
 ## Environment variables
@@ -55,10 +59,10 @@ bun run lint
 - `AUTUMN_URL` (optional)
 - Convex deployment vars as needed (`CONVEX_DEPLOYMENT`, etc.)
 
-For local development, `bun run dev` uses the Convex Vite plugin to start a local backend and inject `VITE_CONVEX_URL=http://127.0.0.1:3210`. You do not need to hardcode the local Convex URL in your env file.
+For local development, `bun run dev` runs the `apps/web` workspace. Its Vite config still uses the Convex Vite plugin to start a local backend from `packages/convex` and inject `VITE_CONVEX_URL=http://127.0.0.1:3210`. You do not need to hardcode the local Convex URL in your env file.
 
 For Clerk auth, set either `CLERK_JWT_ISSUER_DOMAIN` directly or `VITE_CLERK_PUBLISHABLE_KEY` so the issuer domain can be derived automatically.
 
-Billing plans are configured in `autumn.config.ts`.
+Billing plans are configured in `packages/autumn/autumn.config.ts`.
 
 The app syncs billing state back into Convex via billing actions on page entry and after checkout/portal returns. No billing webhook endpoint is required.

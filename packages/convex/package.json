@@ -1,0 +1,39 @@
+{
+  "name": "@lawn/convex",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "bun run lint && bun run typecheck",
+    "format": "eslint \"convex/**/*.ts\" --fix --ignore-pattern 'convex/_generated/**'",
+    "lint": "eslint \"convex/**/*.ts\" --ignore-pattern 'convex/_generated/**'",
+    "typecheck": "tsc --noEmit -p convex/tsconfig.json"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1007.0",
+    "@aws-sdk/s3-request-presigner": "^3.1007.0",
+    "@convex-dev/presence": "^0.3.0",
+    "@convex-dev/rate-limiter": "^0.3.2",
+    "@lawn/shared": "workspace:*",
+    "@mux/mux-node": "^12.8.1",
+    "autumn-js": "^0.1.85",
+    "convex": "^1.32.0"
+  },
+  "exports": {
+    "./api": {
+      "types": "./convex/_generated/api.d.ts",
+      "default": "./convex/_generated/api.js"
+    },
+    "./dataModel": {
+      "types": "./convex/_generated/dataModel.d.ts",
+      "default": "./convex/_generated/dataModel.d.ts"
+    },
+    "./server": {
+      "types": "./convex/_generated/server.d.ts",
+      "default": "./convex/_generated/server.js"
+    }
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
