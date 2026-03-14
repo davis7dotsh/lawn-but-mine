@@ -38,6 +38,11 @@
 
   export type VideoPlayerHandle = {
     seekTo: (time: number, options?: { play?: boolean }) => void;
+    isPlayingNow: () => boolean;
+    getPlaybackDiagnostics: () => {
+      currentTime: number;
+      renderedFrameCount: number | null;
+    };
   };
 
   type QualityLevelOption = {
@@ -61,6 +66,7 @@
     selectedQualityId?: string;
     onSelectQuality?: (id: string) => void;
     controlsBelow?: boolean;
+    onPlaybackStateChange?: (isPlaying: boolean) => void;
   };
 
   const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
@@ -82,6 +88,7 @@
     selectedQualityId,
     onSelectQuality = (_id: string) => {},
     controlsBelow = false,
+    onPlaybackStateChange = (_isPlaying: boolean) => {},
   }: VideoPlayerProps = $props();
 
   let wrapperElement: HTMLDivElement | null = null;
@@ -117,6 +124,7 @@
   let wasPlayingBeforeScrub = false;
   let volumeBeforeMute = 1;
   let resumeTimeOnSourceChange: number | null = null;
+  let resumeSourceWasHls: boolean | null = null;
 
   function clamp(value: number, min: number, max: number) {
     return Math.min(Math.max(value, min), max);
@@ -149,6 +157,23 @@
   const hasExternalQualityOptions = $derived(Boolean(qualityOptionsConfig?.length));
   const hasManualQualityOptions = $derived(isHls && qualityOptions.length > 0);
   const isExternalControls = $derived(controlsBelow && !isFullscreen);
+  const cBtn = $derived(
+    isExternalControls
+      ? "border border-[#1a1a1a]/20 bg-[#1a1a1a]/5 hover:border-[#1a1a1a]/35 hover:bg-[#1a1a1a]/10"
+      : "border border-white/15 bg-white/10 hover:border-white/25 hover:bg-white/20",
+  );
+  const cSurface = $derived(
+    isExternalControls
+      ? "border border-[#1a1a1a]/15 bg-[#1a1a1a]/[0.04]"
+      : "border border-white/10 bg-white/5",
+  );
+  const cTrack = $derived(
+    isExternalControls
+      ? "border border-[#1a1a1a]/20 bg-[#1a1a1a]/10"
+      : "border border-white/10 bg-white/10",
+  );
+  const cFg = $derived(isExternalControls ? "text-[#1a1a1a]" : "text-white");
+  const cMuted = $derived(isExternalControls ? "text-[#888]" : "text-white/90");
   const qualityLabel = $derived.by(() => {
     if (hasExternalQualityOptions) {
       return qualityOptionsConfig?.find((option) => option.id === selectedQualityId)?.label ?? "Quality";
@@ -239,6 +264,23 @@
     onTimeUpdate(next);
   }
 
+  function getRenderedFrameCount() {
+    if (!videoElement) {
+      return null;
+    }
+
+    if (typeof videoElement.getVideoPlaybackQuality === "function") {
+      const { totalVideoFrames } = videoElement.getVideoPlaybackQuality();
+      return Number.isFinite(totalVideoFrames) ? totalVideoFrames : null;
+    }
+
+    const webkitDecodedFrameCount = (
+      videoElement as HTMLVideoElement & { webkitDecodedFrameCount?: number }
+    ).webkitDecodedFrameCount;
+
+    return typeof webkitDecodedFrameCount === "number" ? webkitDecodedFrameCount : null;
+  }
+
   export function seekTo(time: number, options?: { play?: boolean }) {
     applyTime(time);
 
@@ -247,6 +289,17 @@
     }
 
     showControls();
+  }
+
+  export function isPlayingNow() {
+    return Boolean(videoElement && !videoElement.paused);
+  }
+
+  export function getPlaybackDiagnostics() {
+    return {
+      currentTime: videoElement?.currentTime ?? 0,
+      renderedFrameCount: getRenderedFrameCount(),
+    };
   }
 
   function handleSeekBy(delta: number) {
@@ -587,6 +640,7 @@
 
       isPlaying = true;
       isBuffering = false;
+      onPlaybackStateChange(true);
       showControls();
     };
 
@@ -597,6 +651,7 @@
 
       isPlaying = false;
       isBuffering = false;
+      onPlaybackStateChange(false);
       controlsVisible = true;
     };
 
@@ -659,6 +714,7 @@
       }
 
       isPlaying = false;
+      onPlaybackStateChange(false);
       controlsVisible = true;
     };
 
@@ -667,9 +723,11 @@
         return;
       }
 
-      const currentSourceTime = videoElement.currentTime;
-      resumeTimeOnSourceChange =
-        currentSourceTime > 0 ? currentSourceTime : resumeTimeOnSourceChange;
+      const nextSourceIsHls = isHlsSource(src);
+      if (resumeSourceWasHls !== null && resumeSourceWasHls !== nextSourceIsHls) {
+        resumeTimeOnSourceChange = null;
+      }
+      resumeSourceWasHls = nextSourceIsHls;
 
       if (hlsInstance) {
         hlsInstance.destroy();
@@ -768,6 +826,10 @@
       const nextTime = videoElement.currentTime;
       if (nextTime > 0) {
         resumeTimeOnSourceChange = nextTime;
+        resumeSourceWasHls = isHlsSource(src);
+      } else {
+        resumeTimeOnSourceChange = null;
+        resumeSourceWasHls = null;
       }
 
       videoElement.removeEventListener("loadedmetadata", handleLoadedMetadata);
@@ -799,7 +861,7 @@
 {#snippet controlsContent()}
   <div
     bind:this={trackElement}
-    class="relative mb-3 h-3 w-full cursor-pointer touch-none select-none rounded-full border border-white/10 bg-white/10"
+    class={cn("relative mb-3 h-3 w-full cursor-pointer touch-none select-none rounded-full", cTrack)}
     role="slider"
     aria-label="Seek video"
     aria-orientation="horizontal"
@@ -868,7 +930,7 @@
     }}
   >
     <div
-      class="absolute inset-y-0 left-0 rounded-full bg-white/20"
+      class={cn("absolute inset-y-0 left-0 rounded-full", isExternalControls ? "bg-[#1a1a1a]/15" : "bg-white/20")}
       style={`width: ${bufferedPercent * 100}%`}
     ></div>
     <div
@@ -882,7 +944,7 @@
         class={cn(
           "absolute top-1/2 z-10 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/40 shadow",
           marker.comment.resolved ? "bg-green-400" : "bg-orange-400",
-          Math.abs(displayTime - marker.comment.timestampSeconds) < 1.5 ? "ring-2 ring-white/60" : "",
+          Math.abs(displayTime - marker.comment.timestampSeconds) < 1.5 ? (isExternalControls ? "ring-2 ring-[#1a1a1a]/40" : "ring-2 ring-white/60") : "",
         )}
         style={`left: ${marker.position}%`}
         onpointerdown={(event) => {
@@ -909,15 +971,15 @@
     {/if}
 
     <div
-      class="absolute top-1/2 z-20 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/30 bg-white shadow"
+      class={cn("absolute top-1/2 z-20 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full shadow", isExternalControls ? "border border-[#1a1a1a]/30 bg-[#1a1a1a]" : "border border-white/30 bg-white")}
       style={`left: ${playedPercent * 100}%`}
     ></div>
   </div>
 
-  <div class="flex flex-wrap items-center gap-2 text-white">
+  <div class={cn("flex flex-wrap items-center gap-2", cFg)}>
     <button
       type="button"
-      class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 transition hover:border-white/25 hover:bg-white/20"
+      class={cn("inline-flex h-9 w-9 items-center justify-center rounded-full transition", cBtn)}
       aria-label={isPlaying ? "Pause" : "Play"}
       onclick={(event) => {
         event.stopPropagation();
@@ -931,10 +993,10 @@
       {/if}
     </button>
 
-    <div class="hidden items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2 py-1 sm:flex">
+    <div class={cn("hidden items-center gap-1.5 rounded-full px-2 py-1 sm:flex", cSurface)}>
       <button
         type="button"
-        class="inline-flex h-7 w-7 items-center justify-center rounded-full text-white/90 transition hover:bg-white/10"
+        class={cn("inline-flex h-7 w-7 items-center justify-center rounded-full transition", cMuted, isExternalControls ? "hover:bg-[#1a1a1a]/5" : "hover:bg-white/10")}
         aria-label={isMuted ? "Unmute" : "Mute"}
         onclick={(event) => {
           event.stopPropagation();
@@ -963,14 +1025,14 @@
       />
     </div>
 
-    <div class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/90">
+    <div class={cn("rounded-full px-3 py-1 text-xs", cSurface, cMuted)}>
       <span class="font-mono">{formatDuration(displayTime)} / {formatDuration(duration || 0)}</span>
     </div>
 
     <div class="ml-auto flex items-center gap-2">
       <button
         type="button"
-        class="hidden h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:border-white/25 hover:bg-white/15 sm:inline-flex"
+        class={cn("hidden h-9 w-9 items-center justify-center rounded-full transition sm:inline-flex", cBtn)}
         aria-label="Rewind 10 seconds"
         title="Rewind 10 seconds"
         onclick={(event) => {
@@ -983,7 +1045,7 @@
 
       <button
         type="button"
-        class="hidden h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:border-white/25 hover:bg-white/15 sm:inline-flex"
+        class={cn("hidden h-9 w-9 items-center justify-center rounded-full transition sm:inline-flex", cBtn)}
         aria-label="Forward 10 seconds"
         title="Forward 10 seconds"
         onclick={(event) => {
@@ -996,7 +1058,7 @@
 
       <button
         type="button"
-        class="inline-flex h-9 min-w-[56px] items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 text-xs font-medium text-white/95 transition hover:border-white/25 hover:bg-white/15"
+        class={cn("inline-flex h-9 min-w-[56px] items-center justify-center rounded-full px-3 text-xs font-medium transition", cBtn)}
         aria-label={`Playback speed ${playbackRate}x`}
         title="Change playback speed"
         onclick={(event) => {
@@ -1010,7 +1072,7 @@
       <div class="relative">
         <button
           type="button"
-          class="inline-flex h-9 min-w-[108px] items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 text-xs font-medium text-white/95 transition hover:border-white/25 hover:bg-white/15"
+          class={cn("inline-flex h-9 min-w-[108px] items-center justify-center gap-1.5 rounded-full px-3 text-xs font-medium transition", cBtn)}
           aria-label={`Quality ${qualityLabel}`}
           title="Quality settings"
           onclick={(event) => {
@@ -1089,7 +1151,7 @@
       {#if canDownload}
         <button
           type="button"
-          class="inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 text-xs font-medium text-white transition hover:border-white/25 hover:bg-white/20 disabled:opacity-60"
+          class={cn("inline-flex h-9 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-medium transition disabled:opacity-60", cBtn)}
           aria-label="Download video"
           title="Download video"
           disabled={isDownloading}
@@ -1105,7 +1167,7 @@
 
       <button
         type="button"
-        class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-white/10 transition hover:border-white/25 hover:bg-white/20"
+        class={cn("inline-flex h-9 w-9 items-center justify-center rounded-full transition", cBtn)}
         aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
         title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
         onclick={(event) => {
@@ -1125,7 +1187,7 @@
 
 <div
   bind:this={wrapperElement}
-  class={cn("relative", controlsBelow ? "flex h-full flex-col bg-black" : "", className)}
+  class={cn("relative", controlsBelow ? "flex h-full flex-col" : "", className)}
 >
   <!-- svelte-ignore a11y_no_noninteractive_tabindex a11y_no_noninteractive_element_interactions -->
   <div
@@ -1313,7 +1375,7 @@
           controlsVisible ? "opacity-100" : "opacity-0",
         )}
       >
-        <div class="pointer-events-auto bg-gradient-to-t from-black/90 via-black/70 to-transparent px-4 pb-4 pt-10">
+        <div class="pointer-events-auto bg-gradient-to-t from-black/90 via-black/70 to-transparent px-4 pb-4 pt-10" style="--accent:#7cb87c">
           {@render controlsContent()}
         </div>
       </div>
@@ -1365,7 +1427,8 @@
   {#if isExternalControls}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
-      class="shrink-0 bg-black px-4 pb-3 pt-2"
+      class="shrink-0 border-t-2 border-[#1a1a1a] bg-[#f0f0e8] px-4 pb-3 pt-2"
+      style="--accent:#2d5a2d"
       onmousemove={() => showControls()}
       onmouseenter={() => showControls()}
     >

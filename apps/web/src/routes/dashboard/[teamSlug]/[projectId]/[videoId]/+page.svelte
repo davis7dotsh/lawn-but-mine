@@ -44,6 +44,11 @@
     replies?: ThreadedComment[]; 
   }; 
 
+  type OriginalPlaybackSession = {
+    url: string;
+    contentType: string;
+  };
+
   const STORAGE_KEY_CLIENT_ID = "lawn.presence.client_id"; 
   const DEFAULT_HEARTBEAT_INTERVAL_MS = 15_000; 
   const DISCONNECT_PATH = "videoPresence:disconnect"; 
@@ -60,15 +65,13 @@
   let mobileCommentsOpen = $state(false); 
   let playbackSession = $state<{ url: string; posterUrl: string } | null>(null); 
   let isLoadingPlayback = $state(false); 
-  let originalPlaybackUrl = $state<string | null>(null); 
+  let originalPlayback = $state<OriginalPlaybackSession | null>(null); 
   let isLoadingOriginalPlayback = $state(false); 
-  let isRetryingProcessing = $state(false); 
-  let preferredSource = $state<"mux720" | "original">("original"); 
-  let hasManuallySelectedSource = $state(false); 
+  let isRetryingProcessing = $state(false);
   let roomToken = $state<string | null>(null); 
   let sessionToken = $state<string | null>(null); 
   let clientId = $state<string | null>(null); 
-  let commentText = $state(""); 
+  let commentText = $state("");
 
   const teamSlug = $derived(page.params.teamSlug); 
   const projectId = $derived(page.params.projectId as Id<"projects">); 
@@ -116,16 +119,10 @@
 
   const isPlayable = $derived(videoQuery.data?.status === "ready" && Boolean(videoQuery.data?.muxPlaybackId)); 
   const playbackUrl = $derived(playbackSession?.url ?? null); 
-  const activePlaybackUrl = $derived( 
-    preferredSource === "mux720" 
-      ? playbackUrl ?? originalPlaybackUrl 
-      : originalPlaybackUrl ?? playbackUrl, 
-  ); 
-  const activeQualityId = $derived( 
-    activePlaybackUrl && playbackUrl && activePlaybackUrl === playbackUrl ? "mux720" : "original", 
-  ); 
-  const isUsingOriginalFallback = $derived( 
-    Boolean(activePlaybackUrl && activePlaybackUrl === originalPlaybackUrl && !playbackUrl), 
+  const originalPlaybackUrl = $derived(originalPlayback?.url ?? null);
+  const activePlaybackUrl = $derived(playbackUrl ?? originalPlaybackUrl);
+  const isUsingOriginalFallback = $derived(
+    Boolean(activePlaybackUrl && !playbackUrl && originalPlaybackUrl),
   ); 
   const shouldCanonicalize = $derived( 
     Boolean(contextQuery.data && !contextQuery.data.isCanonical && pathname !== contextQuery.data.canonicalPath), 
@@ -187,8 +184,8 @@
   }); 
 
   $effect(() => { 
-    if (!resolvedVideoId || !videoQuery.data || videoQuery.data.status === "uploading") { 
-      originalPlaybackUrl = null; 
+    if (!resolvedVideoId || !videoQuery.data || videoQuery.data.status === "uploading" || videoQuery.data.status === "ready") { 
+      originalPlayback = null; 
       isLoadingOriginalPlayback = false; 
       return; 
     } 
@@ -200,11 +197,11 @@
       .action(api.videoActions.getOriginalPlaybackUrl, { videoId: resolvedVideoId }) 
       .then((result) => { 
         if (cancelled) return; 
-        originalPlaybackUrl = result.url; 
+        originalPlayback = result; 
       }) 
       .catch(() => { 
         if (cancelled) return; 
-        originalPlaybackUrl = null; 
+        originalPlayback = null; 
       }) 
       .finally(() => { 
         if (cancelled) return; 
@@ -214,23 +211,6 @@
     return () => { 
       cancelled = true; 
     }; 
-  }); 
-
-  $effect(() => { 
-    if (!resolvedVideoId) return; 
-    hasManuallySelectedSource = false; 
-    preferredSource = "original"; 
-  }); 
-
-  $effect(() => { 
-    if (hasManuallySelectedSource) return; 
-    if (playbackUrl) { 
-      preferredSource = "mux720"; 
-      return; 
-    } 
-    if (originalPlaybackUrl) { 
-      preferredSource = "original"; 
-    } 
   }); 
 
   $effect(() => { 
@@ -585,10 +565,9 @@
     <div class="flex-1 flex overflow-hidden">
       <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-black">
         {#if videoQuery.data.status === "processing" && isUsingOriginalFallback && activePlaybackUrl}
-          <div class="flex-shrink-0 flex items-center gap-2 bg-[#1a1a1a] px-4 py-2 text-sm text-[#f0f0e8]">
+          <div class="shrink-0 flex items-center gap-2 bg-[#1a1a1a] px-4 py-2 text-sm text-[#f0f0e8]">
             <span class="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-[#7cb87c]"></span>
-            <span class="font-semibold">Original playback active.</span>
-            <span class="text-[#888]">720p stream is still encoding.</span>
+            <span class="font-semibold">Playing original while stream encodes.</span>
           </div>
         {/if}
 
@@ -625,25 +604,6 @@
               downloadFilename={`${videoQuery.data.title}.mp4`}
               onRequestDownload={requestDownload}
               controlsBelow
-              qualityOptionsConfig={[
-                {
-                  id: "mux720",
-                  label: playbackUrl ? "720p" : "720p (encoding...)",
-                  disabled: !playbackUrl,
-                },
-                {
-                  id: "original",
-                  label: "Original",
-                  disabled: !originalPlaybackUrl,
-                },
-              ]}
-              selectedQualityId={activeQualityId}
-              onSelectQuality={(id) => {
-                if (id === "mux720" || id === "original") {
-                  hasManuallySelectedSource = true;
-                  preferredSource = id;
-                }
-              }}
             />
           </div>
         {:else}
