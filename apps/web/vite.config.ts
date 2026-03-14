@@ -1,5 +1,9 @@
+import childProcess from "node:child_process";
+import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import { convexLocal } from "convex-vite-plugin";
+import { generateAdminKey } from "convex-vite-plugin/lib";
 import { sveltekit } from "@sveltejs/kit/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig, loadEnv, type PluginOption } from "vite";
@@ -7,9 +11,84 @@ import { decodeClerkIssuerDomain } from "@lawn/shared/clerkIssuer";
 
 const workspaceRoot = path.resolve(process.cwd(), "../..");
 const convexProjectDir = path.resolve(workspaceRoot, "packages/convex");
+const localConvexStateVersion = "issuer-env-v1";
 
 const getEnvValue = (loadedEnv: Record<string, string>, key: string) =>
   process.env[key] ?? loadedEnv[key];
+
+const computeLocalConvexStateId = (projectDir: string, suffix?: string) => {
+  let gitBranch = "unknown";
+
+  try {
+    const result = childProcess.spawnSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], {
+      cwd: projectDir,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    if (result.status === 0 && result.stdout) {
+      gitBranch = result.stdout.trim();
+    }
+  } catch {
+    // Ignore git errors and fall back to "unknown" like the plugin does.
+  }
+
+  const input = suffix ? `${gitBranch}:${projectDir}:${suffix}` : `${gitBranch}:${projectDir}`;
+  const hash = crypto.createHash("sha256").update(input).digest("hex").slice(0, 16);
+  const sanitizedBranch = gitBranch.replace(/[^a-zA-Z0-9-]/g, "-");
+  const sanitizedSuffix = suffix ? `-${suffix.replace(/[^a-zA-Z0-9-]/g, "-")}` : "";
+
+  return `${sanitizedBranch}${sanitizedSuffix}-${hash}`;
+};
+
+const getClerkIssuerDomain = (loadedEnv: Record<string, string>) => {
+  const publishableKey = getEnvValue(loadedEnv, "VITE_CLERK_PUBLISHABLE_KEY");
+  return (
+    getEnvValue(loadedEnv, "CLERK_JWT_ISSUER_DOMAIN") ??
+    (publishableKey ? decodeClerkIssuerDomain(publishableKey) : null)
+  );
+};
+
+const refreshPersistedConvexAdminKey = (projectDir: string, suffix?: string) => {
+  const stateId = computeLocalConvexStateId(projectDir, suffix);
+  const keysPath = path.join(projectDir, ".convex", stateId, "keys.json");
+
+  if (!fs.existsSync(keysPath)) {
+    return;
+  }
+
+  try {
+    const parsed = JSON.parse(fs.readFileSync(keysPath, "utf8")) as {
+      adminKey?: string;
+      instanceName?: string;
+      instanceSecret?: string;
+    };
+
+    if (!parsed.instanceName || !parsed.instanceSecret) {
+      return;
+    }
+
+    const adminKey = generateAdminKey(parsed.instanceSecret, parsed.instanceName);
+
+    if (parsed.adminKey === adminKey) {
+      return;
+    }
+
+    fs.writeFileSync(
+      keysPath,
+      JSON.stringify(
+        {
+          ...parsed,
+          adminKey,
+        },
+        null,
+        2,
+      ),
+    );
+  } catch {
+    // Leave malformed state alone and let the plugin handle it normally.
+  }
+};
 
 const LOCAL_CONVEX_ENV_KEYS = [
   "AUTUMN_SECRET_KEY",
@@ -32,10 +111,7 @@ const LOCAL_CONVEX_ENV_KEYS = [
 ] as const;
 
 const getLocalConvexEnvVars = (loadedEnv: Record<string, string>) => {
-  const publishableKey = getEnvValue(loadedEnv, "VITE_CLERK_PUBLISHABLE_KEY");
-  const clerkIssuerDomain =
-    getEnvValue(loadedEnv, "CLERK_JWT_ISSUER_DOMAIN") ??
-    (publishableKey ? decodeClerkIssuerDomain(publishableKey) : null);
+  const clerkIssuerDomain = getClerkIssuerDomain(loadedEnv);
 
   const missingVars = [
     !clerkIssuerDomain
@@ -62,6 +138,17 @@ export default defineConfig(({ mode }) => {
   const loadedEnv = loadEnv(mode, workspaceRoot, "");
   const useLocalConvex = getEnvValue(loadedEnv, "USE_LOCAL_CONVEX") === "true";
   const resetLocalBackend = getEnvValue(loadedEnv, "RESET_LOCAL_BACKEND") === "true";
+  const clerkIssuerDomain = getClerkIssuerDomain(loadedEnv);
+
+  if (clerkIssuerDomain) {
+    // Convex deploy inherits process.env, so set the issuer here instead of
+    // pushing it through the local backend env API.
+    process.env.CLERK_JWT_ISSUER_DOMAIN = clerkIssuerDomain;
+  }
+
+  if (useLocalConvex && !resetLocalBackend) {
+    refreshPersistedConvexAdminKey(convexProjectDir, localConvexStateVersion);
+  }
 
   const plugins: PluginOption[] = [
     tailwindcss(),
@@ -74,6 +161,7 @@ export default defineConfig(({ mode }) => {
         siteProxyPort: 3211,
         projectDir: convexProjectDir,
         convexDir: "convex",
+        stateIdSuffix: localConvexStateVersion,
         reset: resetLocalBackend,
         envVars: getLocalConvexEnvVars(loadedEnv),
       }),
