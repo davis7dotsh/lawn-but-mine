@@ -7,6 +7,7 @@
   import CommentList from "@/lib/components/comments/CommentList.svelte";
   import VideoWatchers from "@/lib/components/presence/VideoWatchers.svelte";
   import VideoPlayer from "@/lib/components/video-player/VideoPlayer.svelte";
+  import type { VideoPlayerHandle } from "@/lib/components/video-player/VideoPlayer.svelte";
   import { formatDuration } from "@/lib/utils";
   import { buildSignInHref, clerkAuth, getSharedConvexClient } from "@/lib/useVideoPresence";
 
@@ -29,7 +30,7 @@
   let commentText = $state("");
   let isSubmittingComment = $state(false);
   let commentError = $state<string | null>(null);
-  let playerRef = $state<{ seekTo: (time: number, options?: { play?: boolean }) => void } | null>(null);
+  let playerRef = $state<VideoPlayerHandle | null>(null);
 
   const shareInfoQuery = useQuery(api.shareLinks.getByToken, () =>
     token ? { token } : "skip",

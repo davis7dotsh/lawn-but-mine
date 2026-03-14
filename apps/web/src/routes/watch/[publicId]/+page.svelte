@@ -6,6 +6,7 @@
   import CommentInput from "@/lib/components/comments/CommentInput.svelte";
   import CommentList from "@/lib/components/comments/CommentList.svelte";
   import VideoPlayer from "@/lib/components/video-player/VideoPlayer.svelte";
+  import type { VideoPlayerHandle } from "@/lib/components/video-player/VideoPlayer.svelte";
   import { formatDuration } from "@/lib/utils";
   import { buildSignInHref, clerkAuth, getSharedConvexClient } from "@/lib/useVideoPresence";
 
@@ -56,7 +57,7 @@
   let isSubmittingComment = $state(false);
   let commentError = $state<string | null>(null);
   let mobileCommentsOpen = $state(false);
-  let playerRef = $state<{ seekTo: (time: number, options?: { play?: boolean }) => void } | null>(null);
+  let playerRef = $state<VideoPlayerHandle | null>(null);
 
   async function submitComment(text: string) {
     if (!publicId || !text.trim() || isSubmittingComment) {

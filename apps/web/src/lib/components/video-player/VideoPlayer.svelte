@@ -1,6 +1,5 @@
 <script lang="ts">
-  // @ts-nocheck
-  import { browser } from "$app/environment"; 
+  import { browser } from "$app/environment";
   import type Hls from "hls.js";
   import {
     Check,
@@ -20,26 +19,48 @@
   import { triggerDownload } from "@/lib/download";
   import { cn, formatDuration, formatTimestamp } from "@/lib/utils";
 
-  type CommentMarker = {
+  export type CommentMarker = {
     _id: string;
     timestampSeconds: number;
     resolved: boolean;
   };
 
-  type DownloadResult = {
+  export type DownloadResult = {
     url: string;
     filename?: string;
   };
 
-  type QualityOption = {
+  export type QualityOption = {
     id: string;
     label: string;
     disabled?: boolean;
   };
 
+  export type VideoPlayerHandle = {
+    seekTo: (time: number, options?: { play?: boolean }) => void;
+  };
+
   type QualityLevelOption = {
     level: number;
     label: string;
+  };
+
+  type VideoPlayerProps = {
+    src: string;
+    poster?: string;
+    comments?: CommentMarker[];
+    onTimeUpdate?: (currentTime: number) => void;
+    onMarkerClick?: (comment: CommentMarker) => void;
+    initialTime?: number;
+    className?: string;
+    allowDownload?: boolean;
+    downloadUrl?: string;
+    downloadFilename?: string;
+    onRequestDownload?: () => Promise<DownloadResult | null | undefined> | DownloadResult | null | undefined;
+    qualityOptionsConfig?: QualityOption[];
+    selectedQualityId?: string;
+    onSelectQuality?: (id: string) => void;
+    controlsBelow?: boolean;
   };
 
   const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
@@ -61,28 +82,14 @@
     selectedQualityId,
     onSelectQuality = (_id: string) => {},
     controlsBelow = false,
-  }: {
-    src: string;
-    poster?: string;
-    comments?: CommentMarker[];
-    onTimeUpdate?: (currentTime: number) => void;
-    onMarkerClick?: (comment: CommentMarker) => void;
-    initialTime?: number;
-    className?: string;
-    allowDownload?: boolean;
-    downloadUrl?: string;
-    downloadFilename?: string;
-    onRequestDownload?: () => Promise<DownloadResult | null | undefined> | DownloadResult | null | undefined;
-    qualityOptionsConfig?: QualityOption[];
-    selectedQualityId?: string;
-    onSelectQuality?: (id: string) => void;
-    controlsBelow?: boolean;
-  } = $props();
+  }: VideoPlayerProps = $props();
 
   let wrapperElement: HTMLDivElement | null = null;
   let containerElement: HTMLDivElement | null = null;
   let videoElement: HTMLVideoElement | null = null;
   let trackElement: HTMLDivElement | null = null;
+  let qualityMenuElement = $state<HTMLDivElement | null>(null);
+  let contextMenuElement = $state<HTMLDivElement | null>(null);
   let hlsInstance: Hls | null = null;
 
   let duration = $state(0);
@@ -106,6 +113,7 @@
   let selectedQualityLevel = $state<number>(AUTO_QUALITY_LEVEL);
 
   let hideControlsTimeoutId: number | null = null;
+  let scrubPointerId: number | null = null;
   let wasPlayingBeforeScrub = false;
   let volumeBeforeMute = 1;
   let resumeTimeOnSourceChange: number | null = null;
@@ -154,19 +162,60 @@
     return qualityOptions.find((option) => option.level === selectedQualityLevel)?.label ?? "Auto";
   });
 
-  function showControls() {
+  function clearHideControlsTimeout() {
+    if (!browser || hideControlsTimeoutId === null) {
+      return;
+    }
+
+    window.clearTimeout(hideControlsTimeoutId);
+    hideControlsTimeoutId = null;
+  }
+
+  function scheduleHideControls() {
+    clearHideControlsTimeout();
+
+    if (!browser || !isPlaying || isScrubbing || qualityMenuOpen || contextMenu) {
+      return;
+    }
+
+    hideControlsTimeoutId = window.setTimeout(() => {
+      controlsVisible = false;
+    }, 2_500);
+  }
+
+  function showControls(options?: { persist?: boolean }) {
     controlsVisible = true;
 
-    if (hideControlsTimeoutId !== null) {
-      window.clearTimeout(hideControlsTimeoutId);
-      hideControlsTimeoutId = null;
+    if (options?.persist) {
+      clearHideControlsTimeout();
+      return;
     }
 
-    if (isPlaying) {
-      hideControlsTimeoutId = window.setTimeout(() => {
-        controlsVisible = false;
-      }, 2_500);
+    scheduleHideControls();
+  }
+
+  function closeMenus() {
+    qualityMenuOpen = false;
+    contextMenu = null;
+  }
+
+  function focusPlayer() {
+    containerElement?.focus({ preventScroll: true });
+  }
+
+  function shouldIgnorePlayerShortcut(event: KeyboardEvent) {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return false;
     }
+
+    return (
+      target.isContentEditable ||
+      target.tagName === "INPUT" ||
+      target.tagName === "TEXTAREA" ||
+      target.tagName === "SELECT" ||
+      target.tagName === "BUTTON"
+    );
   }
 
   function updateBuffered() {
@@ -304,7 +353,7 @@
         triggerDownload(downloadUrl, downloadFilename);
       }
     } finally {
-      contextMenu = null;
+      closeMenus();
       isDownloading = false;
     }
   }
@@ -314,7 +363,7 @@
     try {
       await navigator.clipboard.writeText(label);
     } catch {}
-    contextMenu = null;
+    closeMenus();
     showControls();
   }
 
@@ -326,7 +375,7 @@
     const next = !loopEnabled;
     videoElement.loop = next;
     loopEnabled = next;
-    contextMenu = null;
+    closeMenus();
     showControls();
   }
 
@@ -355,11 +404,12 @@
     return percent * duration;
   }
 
-  function startScrub(clientX: number) {
+  function startScrub(clientX: number, pointerId: number) {
     if (!videoElement || !duration) {
       return;
     }
 
+    scrubPointerId = pointerId;
     wasPlayingBeforeScrub = !videoElement.paused;
     videoElement.pause();
     isScrubbing = true;
@@ -381,26 +431,32 @@
     onTimeUpdate(nextTime);
   }
 
-  function endScrub() {
+  function endScrub(pointerId?: number) {
     if (!videoElement || !duration) {
+      return;
+    }
+
+    if (pointerId !== undefined && scrubPointerId !== null && pointerId !== scrubPointerId) {
       return;
     }
 
     const finalTime = clamp(scrubTime, 0, duration);
     videoElement.currentTime = finalTime;
     currentTime = finalTime;
+    onTimeUpdate(finalTime);
     isScrubbing = false;
+    scrubPointerId = null;
 
     if (wasPlayingBeforeScrub) {
       void videoElement.play().catch(() => {});
     }
+
+    showControls();
   }
 
   $effect(() => {
     return () => {
-      if (hideControlsTimeoutId !== null) {
-        window.clearTimeout(hideControlsTimeoutId);
-      }
+      clearHideControlsTimeout();
     };
   });
 
@@ -420,28 +476,16 @@
   });
 
   $effect(() => {
-    if (!browser || !isScrubbing) {
-      return;
-    }
-
-    const handleMove = (event: PointerEvent) => updateScrub(event.clientX);
-    const handleUp = () => endScrub();
-
-    window.addEventListener("pointermove", handleMove);
-    window.addEventListener("pointerup", handleUp, { once: true });
-
-    return () => {
-      window.removeEventListener("pointermove", handleMove);
-      window.removeEventListener("pointerup", handleUp);
-    };
-  });
-
-  $effect(() => {
     if (!browser || !contextMenu) {
       return;
     }
 
-    const handleClose = () => {
+    const handleClose = (event?: Event) => {
+      const target = event?.target;
+      if (target instanceof Node && contextMenuElement?.contains(target)) {
+        return;
+      }
+
       contextMenu = null;
     };
 
@@ -461,7 +505,12 @@
       return;
     }
 
-    const handleClose = () => {
+    const handleClose = (event?: Event) => {
+      const target = event?.target;
+      if (target instanceof Node && qualityMenuElement?.contains(target)) {
+        return;
+      }
+
       qualityMenuOpen = false;
     };
 
@@ -472,6 +521,14 @@
       window.removeEventListener("click", handleClose);
       window.removeEventListener("blur", handleClose);
     };
+  });
+
+  $effect(() => {
+    if (!browser) {
+      return;
+    }
+
+    scheduleHideControls();
   });
 
   $effect(() => {
@@ -742,11 +799,72 @@
 {#snippet controlsContent()}
   <div
     bind:this={trackElement}
-    class="relative mb-3 h-3 w-full cursor-pointer rounded-full border border-white/10 bg-white/10"
+    class="relative mb-3 h-3 w-full cursor-pointer touch-none select-none rounded-full border border-white/10 bg-white/10"
+    role="slider"
+    aria-label="Seek video"
+    aria-orientation="horizontal"
+    aria-valuemin={0}
+    aria-valuemax={duration || 0}
+    aria-valuenow={Math.round(displayTime)}
+    aria-valuetext={formatTimestamp(displayTime)}
+    tabindex="0"
     onpointerdown={(event) => {
       event.preventDefault();
-      showControls();
-      startScrub(event.clientX);
+      event.stopPropagation();
+      focusPlayer();
+      (event.currentTarget as HTMLDivElement).setPointerCapture(event.pointerId);
+      showControls({ persist: true });
+      startScrub(event.clientX, event.pointerId);
+    }}
+    onpointermove={(event) => {
+      if (!isScrubbing) {
+        return;
+      }
+
+      event.preventDefault();
+      updateScrub(event.clientX);
+      showControls({ persist: true });
+    }}
+    onpointerup={(event) => {
+      if ((event.currentTarget as HTMLDivElement).hasPointerCapture(event.pointerId)) {
+        (event.currentTarget as HTMLDivElement).releasePointerCapture(event.pointerId);
+      }
+      endScrub(event.pointerId);
+    }}
+    onpointercancel={(event) => {
+      if ((event.currentTarget as HTMLDivElement).hasPointerCapture(event.pointerId)) {
+        (event.currentTarget as HTMLDivElement).releasePointerCapture(event.pointerId);
+      }
+      endScrub(event.pointerId);
+    }}
+    onlostpointercapture={() => {
+      if (isScrubbing) {
+        endScrub();
+      }
+    }}
+    onkeydown={(event) => {
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        handleSeekBy(-5);
+        return;
+      }
+
+      if (event.key === "ArrowRight") {
+        event.preventDefault();
+        handleSeekBy(5);
+        return;
+      }
+
+      if (event.key === "Home") {
+        event.preventDefault();
+        seekTo(0);
+        return;
+      }
+
+      if (event.key === "End") {
+        event.preventDefault();
+        seekTo(duration || videoElement?.duration || 0);
+      }
     }}
   >
     <div
@@ -780,6 +898,15 @@
         title={`Comment at ${formatTimestamp(marker.comment.timestampSeconds)}`}
       ></button>
     {/each}
+
+    {#if isScrubbing}
+      <div
+        class="pointer-events-none absolute bottom-full z-30 mb-2 -translate-x-1/2 rounded-md bg-black/85 px-2 py-1 text-[11px] font-medium text-white shadow"
+        style={`left: ${playedPercent * 100}%`}
+      >
+        {formatTimestamp(scrubTime)}
+      </div>
+    {/if}
 
     <div
       class="absolute top-1/2 z-20 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/30 bg-white shadow"
@@ -888,8 +1015,10 @@
           title="Quality settings"
           onclick={(event) => {
             event.stopPropagation();
-            showControls();
-            qualityMenuOpen = !qualityMenuOpen;
+            const nextOpen = !qualityMenuOpen;
+            contextMenu = null;
+            qualityMenuOpen = nextOpen;
+            showControls({ persist: nextOpen });
           }}
         >
           <Settings2 class="h-3.5 w-3.5" />
@@ -899,8 +1028,8 @@
 
         {#if qualityMenuOpen}
           <div
+            bind:this={qualityMenuElement}
             class="absolute bottom-11 right-0 z-30 min-w-[170px] rounded-lg border border-white/10 bg-black/90 p-1.5 text-sm text-white shadow-2xl backdrop-blur"
-            onclick={(event) => event.stopPropagation()}
           >
             {#if hasExternalQualityOptions}
               {#each qualityOptionsConfig ?? [] as option (option.id)}
@@ -998,6 +1127,7 @@
   bind:this={wrapperElement}
   class={cn("relative", controlsBelow ? "flex h-full flex-col bg-black" : "", className)}
 >
+  <!-- svelte-ignore a11y_no_noninteractive_tabindex a11y_no_noninteractive_element_interactions -->
   <div
     bind:this={containerElement}
     class={cn(
@@ -1009,15 +1139,26 @@
             isFullscreen ? "rounded-none border-none shadow-none" : "",
           ),
     )}
+    role="application"
+    aria-label="Video player"
     tabindex="0"
+    onpointerdown={() => {
+      focusPlayer();
+    }}
     onmousemove={() => showControls()}
     onmouseenter={() => showControls()}
     onmouseleave={() => {
-      if (isPlaying) {
+      if (isPlaying && !isScrubbing && !qualityMenuOpen && !contextMenu) {
+        clearHideControlsTimeout();
         controlsVisible = false;
       }
     }}
+    onfocusin={() => showControls({ persist: true })}
     onkeydown={(event) => {
+      if (shouldIgnorePlayerShortcut(event)) {
+        return;
+      }
+
       const key = event.key.toLowerCase();
 
       if (event.key === " " || key === "k") {
@@ -1038,6 +1179,44 @@
         return;
       }
 
+      if (key === "j") {
+        event.preventDefault();
+        handleSeekBy(-10);
+        return;
+      }
+
+      if (key === "l") {
+        event.preventDefault();
+        handleSeekBy(10);
+        return;
+      }
+
+      if (event.key === "Home") {
+        event.preventDefault();
+        seekTo(0);
+        return;
+      }
+
+      if (event.key === "End") {
+        event.preventDefault();
+        seekTo(duration || videoElement?.duration || 0);
+        return;
+      }
+
+      if (event.key === "ArrowUp") {
+        event.preventDefault();
+        setVideoVolume((videoElement?.muted ? volumeBeforeMute : videoElement?.volume ?? volume) + 0.05);
+        showControls();
+        return;
+      }
+
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        setVideoVolume((videoElement?.volume ?? volume) - 0.05);
+        showControls();
+        return;
+      }
+
       if (key === "f") {
         event.preventDefault();
         void toggleFullscreen();
@@ -1047,16 +1226,23 @@
       if (key === "m") {
         event.preventDefault();
         toggleMute();
+        return;
+      }
+
+      if (event.key === "Escape") {
+        closeMenus();
+        showControls();
       }
     }}
     oncontextmenu={(event) => {
       event.preventDefault();
-      showControls();
+      focusPlayer();
+      showControls({ persist: true });
       qualityMenuOpen = false;
 
       const rect = (event.currentTarget as HTMLDivElement).getBoundingClientRect();
       const menuWidth = 180;
-      const menuHeight = 120;
+      const menuHeight = 16 + (canDownload ? 3 : 2) * 40;
       const x = clamp(event.clientX - rect.left, 8, rect.width - menuWidth - 8);
       const y = clamp(event.clientY - rect.top, 8, rect.height - menuHeight - 8);
       contextMenu = { x, y };
@@ -1074,6 +1260,11 @@
       onclick={(event) => {
         event.stopPropagation();
         togglePlay();
+      }}
+      ondblclick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void toggleFullscreen();
       }}
     ></video>
 
@@ -1130,6 +1321,7 @@
 
     {#if contextMenu}
       <div
+        bind:this={contextMenuElement}
         class="absolute z-30 w-44 rounded-lg border border-white/10 bg-black/90 p-1.5 text-sm text-white shadow-2xl backdrop-blur"
         style={`left: ${contextMenu.x}px; top: ${contextMenu.y}px;`}
       >
@@ -1171,6 +1363,7 @@
   </div>
 
   {#if isExternalControls}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
     <div
       class="shrink-0 bg-black px-4 pb-3 pt-2"
       onmousemove={() => showControls()}

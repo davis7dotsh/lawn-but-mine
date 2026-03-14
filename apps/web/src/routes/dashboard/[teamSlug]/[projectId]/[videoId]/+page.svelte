@@ -16,6 +16,8 @@
   } from "lucide-svelte"; 
   import DashboardHeader from "@/lib/components/DashboardHeader.svelte"; 
   import ShareDialog from "@/lib/components/ShareDialog.svelte"; 
+  import VideoPlayer from "@/lib/components/video-player/VideoPlayer.svelte";
+  import type { VideoPlayerHandle } from "@/lib/components/video-player/VideoPlayer.svelte";
   import VideoWorkflowStatusControl, { 
     type VideoWorkflowStatus, 
   } from "@/lib/components/videos/VideoWorkflowStatusControl.svelte"; 
@@ -49,7 +51,7 @@
 
   const convex = useConvexClient(); 
 
-  let videoElement = $state<HTMLVideoElement | null>(null); 
+  let playerRef = $state<VideoPlayerHandle | null>(null); 
   let currentTime = $state(0); 
   let isEditingTitle = $state(false); 
   let editedTitle = $state(""); 
@@ -348,12 +350,12 @@
     }; 
   }); 
 
-  const handleTimeUpdate = () => { 
-    if (!videoElement) return; 
-    currentTime = videoElement.currentTime; 
+  const handleTimeUpdate = (time: number) => { 
+    currentTime = time; 
   }; 
 
-  const handleMarkerClick = (commentId: Id<"comments">) => { 
+  const handleMarkerClick = (comment: { _id: string } | Id<"comments">) => { 
+    const commentId = (typeof comment === "string" ? comment : comment._id) as Id<"comments">;
     highlightedCommentId = commentId; 
     setTimeout(() => { 
       if (highlightedCommentId === commentId) { 
@@ -370,9 +372,7 @@
   }; 
 
   const handleTimestampClick = (time: number) => { 
-    if (!videoElement) return; 
-    videoElement.currentTime = time; 
-    videoElement.play().catch(() => undefined); 
+    playerRef?.seekTo(time, { play: true });
     highlightedCommentId = undefined; 
   }; 
 
@@ -438,6 +438,13 @@
   const canRetryProcessing = $derived(Boolean(canEdit && videoQuery.data?.s3Key)); 
 
   const commentsCount = $derived(commentsQuery.data?.length ?? 0); 
+  const markerComments = $derived.by(() =>
+    (commentsQuery.data ?? []).map((comment) => ({
+      _id: comment._id,
+      timestampSeconds: comment.timestampSeconds,
+      resolved: comment.resolved,
+    })),
+  );
 
 </script>
 
@@ -607,59 +614,37 @@
 
         {#if activePlaybackUrl}
           <div class="flex flex-1 min-h-0 flex-col">
-            <video
-              bind:this={videoElement}
-              class="w-full flex-1 min-h-0 bg-black object-contain"
+            <VideoPlayer
+              bind:this={playerRef}
               src={activePlaybackUrl}
               poster={playbackSession?.posterUrl}
-              controls
-              playsinline
-              on:timeupdate={handleTimeUpdate}
-            ></video>
-
-            <div class="flex-shrink-0 flex flex-wrap items-center gap-2 border-t border-white/10 bg-black px-4 py-3 text-sm text-white/80">
-              <span class="font-semibold">Playback</span>
-              <button
-                type="button"
-                class={`border px-2 py-1 ${activeQualityId === "mux720" ? "border-white bg-white text-black" : "border-white/20 text-white/70"} disabled:cursor-not-allowed disabled:opacity-40`}
-                disabled={!playbackUrl}
-                on:click={() => {
+              comments={markerComments}
+              onTimeUpdate={handleTimeUpdate}
+              onMarkerClick={handleMarkerClick}
+              allowDownload={videoQuery.data.status === "ready"}
+              downloadFilename={`${videoQuery.data.title}.mp4`}
+              onRequestDownload={requestDownload}
+              controlsBelow
+              qualityOptionsConfig={[
+                {
+                  id: "mux720",
+                  label: playbackUrl ? "720p" : "720p (encoding...)",
+                  disabled: !playbackUrl,
+                },
+                {
+                  id: "original",
+                  label: "Original",
+                  disabled: !originalPlaybackUrl,
+                },
+              ]}
+              selectedQualityId={activeQualityId}
+              onSelectQuality={(id) => {
+                if (id === "mux720" || id === "original") {
                   hasManuallySelectedSource = true;
-                  preferredSource = "mux720";
-                }}
-              >
-                {playbackUrl ? "720p" : "720p (encoding...)"}
-              </button>
-              <button
-                type="button"
-                class={`border px-2 py-1 ${activeQualityId === "original" ? "border-white bg-white text-black" : "border-white/20 text-white/70"} disabled:cursor-not-allowed disabled:opacity-40`}
-                disabled={!originalPlaybackUrl}
-                on:click={() => {
-                  hasManuallySelectedSource = true;
-                  preferredSource = "original";
-                }}
-              >
-                Original
-              </button>
-              {#if videoQuery.data.status === "ready"}
-                <button
-                  type="button"
-                  class="ml-auto border border-white/20 px-2 py-1 text-white/80 hover:bg-white/10"
-                  on:click={async () => {
-                    const download = await requestDownload();
-                    if (!download?.url) return;
-                    const anchor = document.createElement("a");
-                    anchor.href = download.url;
-                    anchor.download = download.filename ?? `${videoQuery.data.title}.mp4`;
-                    document.body.appendChild(anchor);
-                    anchor.click();
-                    document.body.removeChild(anchor);
-                  }}
-                >
-                  Download
-                </button>
-              {/if}
-            </div>
+                  preferredSource = id;
+                }
+              }}
+            />
           </div>
         {:else}
           <div class="flex-1 flex items-center justify-center">
