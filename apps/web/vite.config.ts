@@ -12,9 +12,47 @@ import { decodeClerkIssuerDomain } from "@lawn/shared/clerkIssuer";
 const workspaceRoot = path.resolve(process.cwd(), "../..");
 const convexProjectDir = path.resolve(workspaceRoot, "packages/convex");
 const localConvexStateVersion = "issuer-env-v1";
+const defaultLocalConvexPort = 3210;
+const maxLocalPortAttempts = 100;
 
 const getEnvValue = (loadedEnv: Record<string, string>, key: string) =>
   process.env[key] ?? loadedEnv[key];
+
+const isPortAvailableSync = (port: number) => {
+  if (process.platform === "win32") {
+    const result = childProcess.spawnSync("netstat", ["-an"], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+
+    if (result.status !== 0) {
+      return true;
+    }
+
+    return !result.stdout?.includes(`:${port} `);
+  }
+
+  const result = childProcess.spawnSync("lsof", ["-i", `:${port}`, "-sTCP:LISTEN"], {
+    encoding: "utf-8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
+
+  return result.status !== 0 || !result.stdout?.trim();
+};
+
+const findAvailablePortSync = (startPort: number) => {
+  for (let attempt = 0; attempt < maxLocalPortAttempts; attempt += 1) {
+    const port = startPort + attempt;
+
+    if (isPortAvailableSync(port)) {
+      return port;
+    }
+  }
+
+  throw new Error(
+    `Could not find an available local Convex port after checking ${maxLocalPortAttempts} ports starting at ${startPort}.`,
+  );
+};
 
 const computeLocalConvexStateId = (projectDir: string, suffix?: string) => {
   let gitBranch = "unknown";
@@ -139,6 +177,9 @@ export default defineConfig(({ mode }) => {
   const useLocalConvex = getEnvValue(loadedEnv, "USE_LOCAL_CONVEX") === "true";
   const resetLocalBackend = getEnvValue(loadedEnv, "RESET_LOCAL_BACKEND") === "true";
   const clerkIssuerDomain = getClerkIssuerDomain(loadedEnv);
+  const localConvexPort = useLocalConvex ? findAvailablePortSync(defaultLocalConvexPort) : null;
+  const localConvexSiteProxyPort =
+    localConvexPort !== null ? findAvailablePortSync(localConvexPort + 1) : null;
 
   if (clerkIssuerDomain) {
     // Convex deploy inherits process.env, so set the issuer here instead of
@@ -150,6 +191,12 @@ export default defineConfig(({ mode }) => {
     refreshPersistedConvexAdminKey(convexProjectDir, localConvexStateVersion);
   }
 
+  if (localConvexPort !== null && localConvexPort !== defaultLocalConvexPort) {
+    console.warn(
+      `[convex] Port ${defaultLocalConvexPort} is already in use, so the local backend will start on ${localConvexPort} instead.`,
+    );
+  }
+
   const plugins: PluginOption[] = [
     tailwindcss(),
   ];
@@ -157,8 +204,8 @@ export default defineConfig(({ mode }) => {
   if (useLocalConvex) {
     plugins.push(
       convexLocal({
-        port: 3210,
-        siteProxyPort: 3211,
+        port: localConvexPort,
+        siteProxyPort: localConvexSiteProxyPort,
         projectDir: convexProjectDir,
         convexDir: "convex",
         stateIdSuffix: localConvexStateVersion,

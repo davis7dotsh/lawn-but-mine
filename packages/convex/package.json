@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev:hosted": "bun x convex dev",
     "check": "bun run lint && bun run typecheck",
     "format": "eslint \"convex/**/*.ts\" --fix --ignore-pattern 'convex/_generated/**'",
     "lint": "eslint \"convex/**/*.ts\" --ignore-pattern 'convex/_generated/**'",

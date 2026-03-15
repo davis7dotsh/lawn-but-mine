@@ -14,7 +14,7 @@ Run app + Convex locally:
 bun run dev
 ```
 
-This starts a local Convex backend on `http://127.0.0.1:3210` and points the web app at it automatically.
+This starts a local Convex backend and points the web app at it automatically. It prefers `http://127.0.0.1:3210`, but will move to the next available port if another local Convex instance is already using that one.
 
 Run only the web app:
 
@@ -59,7 +59,7 @@ bun run format:all
 - `AUTUMN_URL` (optional)
 - Convex deployment vars as needed (`CONVEX_DEPLOYMENT`, etc.)
 
-For local development, `bun run dev` runs the `apps/web` workspace. Its Vite config still uses the Convex Vite plugin to start a local backend from `packages/convex` and inject `VITE_CONVEX_URL=http://127.0.0.1:3210`. You do not need to hardcode the local Convex URL in your env file.
+For local development, `bun run dev` runs the `apps/web` workspace. Its Vite config still uses the Convex Vite plugin to start a local backend from `packages/convex` and inject the chosen local `VITE_CONVEX_URL`. You do not need to hardcode the local Convex URL in your env file.
 
 For Clerk auth, set either `CLERK_JWT_ISSUER_DOMAIN` directly or `VITE_CLERK_PUBLISHABLE_KEY` so the issuer domain can be derived automatically.
 

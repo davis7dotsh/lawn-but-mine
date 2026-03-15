@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "turbo run dev --filter=@lawn/web",
     "dev:web": "turbo run dev --filter=@lawn/web",
-    "dev:hosted": "turbo run dev:hosted --filter=@lawn/web",
+    "dev:hosted": "turbo run dev:hosted --filter=@lawn/web --filter=@lawn/convex",
     "build": "turbo run build --filter=@lawn/web",
     "build:vercel": "bun --cwd packages/convex x convex deploy --cmd 'bun --cwd ../../apps/web run build' --cmd-url-env-var-name VITE_CONVEX_URL",
     "start": "bun --cwd apps/web run start",
@@ -40,5 +40,8 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.57.0"
   },
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "convex": "^1.33.1"
+  }
 }

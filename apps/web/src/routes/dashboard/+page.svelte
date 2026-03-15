@@ -13,6 +13,7 @@
   const teamsQuery = useQuery(api.teams.listWithProjects, {}); 
 
   let createDialogOpen = $state(false); 
+  let hasAutoOpenedCreateDialog = $state(false); 
 
   const prewarmProject = (teamSlug: string, projectId: Id<"projects">) => 
     prewarmSpecs(convex, [ 
@@ -27,6 +28,15 @@
         projectId, 
       }), 
     ]); 
+
+  $effect(() => { 
+    if (hasAutoOpenedCreateDialog || teamsQuery.data === undefined || teamsQuery.data.length > 0) {
+      return; 
+    } 
+
+    createDialogOpen = true; 
+    hasAutoOpenedCreateDialog = true; 
+  }); 
 </script>
 
 {#if teamsQuery.data && teamsQuery.data.length === 0}
