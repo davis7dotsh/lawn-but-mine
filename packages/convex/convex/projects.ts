@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getUser, requireTeamAccess, requireProjectAccess } from "./auth";
 import { assertTeamHasActiveSubscription } from "./billingHelpers";
+import { deleteVideoTagLinks } from "./tagHelpers";
 
 export const create = mutation({
   args: {
@@ -134,6 +135,8 @@ export const remove = mutation({
       .collect();
 
     for (const video of videos) {
+      await deleteVideoTagLinks(ctx, video._id);
+
       // Delete comments
       const comments = await ctx.db
         .query("comments")

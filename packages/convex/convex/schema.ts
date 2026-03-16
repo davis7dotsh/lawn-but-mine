@@ -61,6 +61,18 @@ export default defineSchema({
     description: v.optional(v.string()),
   }).index("by_team", ["teamId"]),
 
+  tags: defineTable({
+    teamId: v.id("teams"),
+    name: v.string(),
+    color: v.string(),
+    createdByClerkId: v.string(),
+    createdByName: v.string(),
+    createdByAvatarUrl: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_team", ["teamId"])
+    .index("by_team_and_name", ["teamId", "name"]),
+
   videos: defineTable({
     projectId: v.id("projects"),
     uploadedByClerkId: v.string(),
@@ -104,6 +116,16 @@ export default defineSchema({
     .index("by_mux_upload_id", ["muxUploadId"])
     .index("by_mux_asset_id", ["muxAssetId"])
     .index("by_mux_playback_id", ["muxPlaybackId"]),
+
+  videoTags: defineTable({
+    videoId: v.id("videos"),
+    tagId: v.id("tags"),
+    addedByClerkId: v.string(),
+    addedAt: v.number(),
+  })
+    .index("by_video", ["videoId"])
+    .index("by_tag", ["tagId"])
+    .index("by_video_and_tag", ["videoId", "tagId"]),
 
   comments: defineTable({
     videoId: v.id("videos"),

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import type { HTMLAnchorAttributes, HTMLButtonAttributes } from "svelte/elements";
 
   import { cn } from "@/lib/utils";
 
@@ -29,6 +30,16 @@
     icon: "h-10 w-10",
   };
 
+  type SharedProps = {
+    href?: string;
+    type?: "button" | "submit" | "reset";
+    variant?: Variant;
+    size?: Size;
+    class?: string;
+    disabled?: boolean;
+    children?: Snippet;
+  };
+
   let {
     href,
     type = "button",
@@ -38,15 +49,7 @@
     disabled = false,
     children,
     ...restProps
-  }: {
-    href?: string;
-    type?: "button" | "submit" | "reset";
-    variant?: Variant;
-    size?: Size;
-    class?: string;
-    disabled?: boolean;
-    children?: Snippet;
-  } = $props();
+  }: SharedProps & HTMLButtonAttributes & HTMLAnchorAttributes = $props();
 
   const classes = $derived(
     cn(

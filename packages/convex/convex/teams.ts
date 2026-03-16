@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { getUser, identityAvatarUrl, identityEmail, identityName, requireUser, requireTeamAccess } from "./auth";
 import { getTeamSubscriptionState } from "./billingHelpers";
+import { deleteVideoTagLinks } from "./tagHelpers";
 
 function normalizedEmail(value: string) {
   return value.trim().toLowerCase();
@@ -427,6 +428,8 @@ export const deleteTeam = mutation({
         .collect();
 
       for (const video of videos) {
+        await deleteVideoTagLinks(ctx, video._id);
+
         // Delete comments
         const comments = await ctx.db
           .query("comments")
@@ -456,6 +459,14 @@ export const deleteTeam = mutation({
       }
 
       await ctx.db.delete(project._id);
+    }
+
+    const tags = await ctx.db
+      .query("tags")
+      .withIndex("by_team", (q) => q.eq("teamId", args.teamId))
+      .collect();
+    for (const tag of tags) {
+      await ctx.db.delete(tag._id);
     }
 
     await ctx.db.delete(args.teamId);

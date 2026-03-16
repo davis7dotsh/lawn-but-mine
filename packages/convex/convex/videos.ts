@@ -1,11 +1,12 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
-import type { MutationCtx } from "./_generated/server";
+import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { identityName, requireProjectAccess, requireVideoAccess } from "./auth";
 import type { Id } from "./_generated/dataModel";
 import { generateUniqueToken } from "./security";
 import { resolveActiveShareGrant } from "./shareAccess";
 import { assertTeamCanStoreBytes } from "./billingHelpers";
+import { deleteVideoTagLinks } from "./tagHelpers";
 
 const workflowStatusValidator = v.union(
   v.literal("review"),
@@ -48,6 +49,47 @@ async function deleteShareAccessGrantsForLink(
   for (const grant of grants) {
     await ctx.db.delete(grant._id);
   }
+}
+
+async function getTagsForVideo(
+  ctx: QueryCtx | MutationCtx,
+  videoId: Id<"videos">,
+) {
+  const assignments = await ctx.db
+    .query("videoTags")
+    .withIndex("by_video", (q) => q.eq("videoId", videoId))
+    .collect();
+
+  const tags = await Promise.all(
+    assignments.map(async (assignment) => await ctx.db.get(assignment.tagId)),
+  );
+
+  return tags
+    .filter((tag): tag is NonNullable<typeof tag> => tag !== null)
+    .sort((left, right) => left.name.localeCompare(right.name));
+}
+
+async function deleteVideoRecord(ctx: MutationCtx, videoId: Id<"videos">) {
+  await deleteVideoTagLinks(ctx, videoId);
+
+  const comments = await ctx.db
+    .query("comments")
+    .withIndex("by_video", (q) => q.eq("videoId", videoId))
+    .collect();
+  for (const comment of comments) {
+    await ctx.db.delete(comment._id);
+  }
+
+  const shareLinks = await ctx.db
+    .query("shareLinks")
+    .withIndex("by_video", (q) => q.eq("videoId", videoId))
+    .collect();
+  for (const link of shareLinks) {
+    await deleteShareAccessGrantsForLink(ctx, link._id);
+    await ctx.db.delete(link._id);
+  }
+
+  await ctx.db.delete(videoId);
 }
 
 export const create = mutation({
@@ -95,16 +137,20 @@ export const list = query({
 
     return await Promise.all(
       videos.map(async (video) => {
-        const comments = await ctx.db
-          .query("comments")
-          .withIndex("by_video", (q) => q.eq("videoId", video._id))
-          .collect();
+        const [comments, tags] = await Promise.all([
+          ctx.db
+            .query("comments")
+            .withIndex("by_video", (q) => q.eq("videoId", video._id))
+            .collect(),
+          getTagsForVideo(ctx, video._id),
+        ]);
 
         return {
           ...video,
           uploaderName: video.uploaderName ?? "Unknown",
           workflowStatus: normalizeWorkflowStatus(video.workflowStatus),
           commentCount: comments.length,
+          tags,
         };
       }),
     );
@@ -115,11 +161,13 @@ export const get = query({
   args: { videoId: v.id("videos") },
   handler: async (ctx, args) => {
     const { video, membership } = await requireVideoAccess(ctx, args.videoId);
+    const tags = await getTagsForVideo(ctx, args.videoId);
     return {
       ...video,
       uploaderName: video.uploaderName ?? "Unknown",
       workflowStatus: normalizeWorkflowStatus(video.workflowStatus),
       role: membership.role,
+      tags,
     };
   },
 });
@@ -249,25 +297,23 @@ export const remove = mutation({
   args: { videoId: v.id("videos") },
   handler: async (ctx, args) => {
     await requireVideoAccess(ctx, args.videoId, "admin");
+    await deleteVideoRecord(ctx, args.videoId);
+  },
+});
 
-    const comments = await ctx.db
-      .query("comments")
-      .withIndex("by_video", (q) => q.eq("videoId", args.videoId))
-      .collect();
-    for (const comment of comments) {
-      await ctx.db.delete(comment._id);
+export const removeMany = mutation({
+  args: { videoIds: v.array(v.id("videos")) },
+  handler: async (ctx, args) => {
+    const videoIds = Array.from(new Set(args.videoIds));
+    if (videoIds.length === 0) {
+      return;
     }
 
-    const shareLinks = await ctx.db
-      .query("shareLinks")
-      .withIndex("by_video", (q) => q.eq("videoId", args.videoId))
-      .collect();
-    for (const link of shareLinks) {
-      await deleteShareAccessGrantsForLink(ctx, link._id);
-      await ctx.db.delete(link._id);
-    }
+    await Promise.all(videoIds.map((videoId) => requireVideoAccess(ctx, videoId, "admin")));
 
-    await ctx.db.delete(args.videoId);
+    for (const videoId of videoIds) {
+      await deleteVideoRecord(ctx, videoId);
+    }
   },
 });
 

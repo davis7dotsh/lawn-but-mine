@@ -12,9 +12,12 @@
     MessageSquare, 
     MoreVertical, 
     RefreshCcw, 
+    Tag, 
     X, 
   } from "lucide-svelte"; 
   import DashboardHeader from "@/lib/components/DashboardHeader.svelte"; 
+  import ManageVideoTagsDialog from "@/lib/components/tags/ManageVideoTagsDialog.svelte";
+  import TagPill from "@/lib/components/tags/TagPill.svelte";
   import ShareDialog from "@/lib/components/ShareDialog.svelte"; 
   import VideoPlayer from "@/lib/components/video-player/VideoPlayer.svelte";
   import type { VideoPlayerHandle } from "@/lib/components/video-player/VideoPlayer.svelte";
@@ -62,6 +65,7 @@
   let editedTitle = $state(""); 
   let highlightedCommentId = $state<Id<"comments"> | undefined>(undefined); 
   let shareDialogOpen = $state(false); 
+  let manageTagsOpen = $state(false);
   let mobileCommentsOpen = $state(false); 
   let playbackSession = $state<{ url: string; posterUrl: string } | null>(null); 
   let isLoadingPlayback = $state(false); 
@@ -85,6 +89,9 @@
   })); 
 
   const resolvedTeamSlug = $derived(contextQuery.data?.team.slug ?? teamSlug); 
+  const resolvedTeamId = $derived(
+    contextQuery.data?.team?._id as Id<"teams"> | null,
+  );
   const resolvedProjectId = $derived( 
     contextQuery.data?.project?._id as Id<"projects"> | undefined, 
   ); 
@@ -414,7 +421,16 @@
   }; 
 
   const canEdit = $derived(videoQuery.data?.role !== "viewer"); 
-  const canComment = $derived(Boolean(resolvedVideoId)); 
+  const canComment = $derived(Boolean(resolvedVideoId));
+  const videoTags = $derived(videoQuery.data?.tags ?? []);
+  const selectedVideosForTags = $derived.by(() => {
+    if (!videoQuery.data || !resolvedVideoId) return [];
+    return [{
+      _id: resolvedVideoId,
+      title: videoQuery.data.title,
+      tags: videoTags,
+    }];
+  }); 
   const canRetryProcessing = $derived(Boolean(canEdit && videoQuery.data?.s3Key)); 
 
   const commentsCount = $derived(commentsQuery.data?.length ?? 0); 
@@ -477,7 +493,7 @@
         <button
           type="button"
           class="inline-flex items-center justify-center border-2 border-[#1a1a1a] px-3 py-2 text-sm font-bold text-[#1a1a1a] hover:bg-[#e8e8e0]"
-          on:click={() => (shareDialogOpen = true)}
+          onclick={() => (shareDialogOpen = true)}
         >
           <LinkIcon class="mr-1.5 h-4 w-4" />
           Share
@@ -485,7 +501,7 @@
         <button
           type="button"
           class="inline-flex items-center justify-center border-2 border-[#1a1a1a] px-3 py-2 text-sm font-bold text-[#1a1a1a] hover:bg-[#e8e8e0] lg:hidden"
-          on:click={() => (mobileCommentsOpen = true)}
+          onclick={() => (mobileCommentsOpen = true)}
         >
           <MessageSquare class="h-4 w-4" />
           {#if commentsCount > 0}
@@ -504,7 +520,7 @@
         <button
           type="button"
           class="inline-flex h-8 w-8 items-center justify-center border-2 border-[#1a1a1a]"
-          on:click={() => (mobileCommentsOpen = !mobileCommentsOpen)}
+          onclick={() => (mobileCommentsOpen = !mobileCommentsOpen)}
         >
           <MoreVertical class="h-4 w-4" />
         </button>
@@ -517,7 +533,7 @@
           <input
             bind:value={editedTitle}
             class="w-full max-w-md border-2 border-[#1a1a1a] bg-[#f0f0e8] px-3 py-2 text-base font-black tracking-tight outline-none"
-            on:keydown={(event) => {
+            onkeydown={(event) => {
               if (event.key === "Enter") {
                 void handleSaveTitle();
               }
@@ -529,26 +545,26 @@
           <button
             type="button"
             class="inline-flex h-10 w-10 items-center justify-center border-2 border-[#1a1a1a] bg-[#1a1a1a] text-[#f0f0e8]"
-            on:click={handleSaveTitle}
+            onclick={handleSaveTitle}
           >
             <Check class="h-4 w-4" />
           </button>
           <button
             type="button"
             class="inline-flex h-10 w-10 items-center justify-center border-2 border-[#1a1a1a]"
-            on:click={() => (isEditingTitle = false)}
+            onclick={() => (isEditingTitle = false)}
           >
             <X class="h-4 w-4" />
           </button>
         </div>
       {:else}
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <h1 class="text-lg font-black text-[#1a1a1a]">{videoQuery.data.title}</h1>
           {#if canEdit}
             <button
               type="button"
               class="inline-flex h-8 w-8 items-center justify-center border-2 border-[#1a1a1a] hover:bg-[#e8e8e0]"
-              on:click={startEditingTitle}
+              onclick={startEditingTitle}
             >
               <Edit2 class="h-3.5 w-3.5" />
             </button>
@@ -557,6 +573,24 @@
             <span class="border-2 border-[#1a1a1a] px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-[#888]">
               {videoQuery.data.status === "uploading" ? "Uploading" : videoQuery.data.status === "processing" ? "Processing" : "Failed"}
             </span>
+          {/if}
+
+          {#if videoTags.length > 0 || canEdit}
+            <div class="flex items-center gap-2 border-l border-[#ccc] pl-3">
+              {#each videoTags as tag (tag._id)}
+                <TagPill {tag} />
+              {/each}
+              {#if canEdit}
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-1 text-[11px] text-[#888] hover:text-[#1a1a1a]"
+                  onclick={() => (manageTagsOpen = true)}
+                >
+                  <Tag class="h-3 w-3" />
+                  {videoTags.length === 0 ? "+ tag" : "+"}
+                </button>
+              {/if}
+            </div>
           {/if}
         </div>
       {/if}
@@ -582,7 +616,7 @@
                 type="button"
                 class="inline-flex items-center justify-center border border-[#a33a46] px-3 py-1.5 text-sm font-bold text-[#f8d7da] hover:bg-[#3a161b]"
                 disabled={isRetryingProcessing}
-                on:click={handleRetryProcessing}
+                onclick={handleRetryProcessing}
               >
                 <RefreshCcw class="mr-2 h-4 w-4" />
                 {isRetryingProcessing ? "Retrying..." : "Retry processing"}
@@ -633,7 +667,7 @@
                         type="button"
                         class="inline-flex items-center justify-center border-2 border-[#1a1a1a] bg-[#f0f0e8] px-3 py-2 text-sm font-bold text-[#1a1a1a]"
                         disabled={isRetryingProcessing}
-                        on:click={handleRetryProcessing}
+                        onclick={handleRetryProcessing}
                       >
                         {isRetryingProcessing ? "Retrying..." : "Retry processing"}
                       </button>
@@ -667,7 +701,7 @@
                     <button
                       type="button"
                       class="text-left text-sm font-bold text-[#1a1a1a]"
-                      on:click={() => {
+                      onclick={() => {
                         handleTimestampClick(comment.timestampSeconds);
                         handleMarkerClick(comment._id);
                       }}
@@ -677,7 +711,7 @@
                     <button
                       type="button"
                       class="mt-1 block text-xs font-mono text-[#888] underline"
-                      on:click={() => {
+                      onclick={() => {
                         handleTimestampClick(comment.timestampSeconds);
                         handleMarkerClick(comment._id);
                       }}
@@ -691,14 +725,14 @@
                       <button
                         type="button"
                         class="text-[10px] font-bold uppercase tracking-wider text-[#888] hover:text-[#1a1a1a]"
-                        on:click={() => handleToggleResolved(comment._id)}
+                        onclick={() => handleToggleResolved(comment._id)}
                       >
                         {comment.resolved ? "Reopen" : "Resolve"}
                       </button>
                       <button
                         type="button"
                         class="text-[10px] font-bold uppercase tracking-wider text-[#dc2626]"
-                        on:click={() => handleDeleteComment(comment._id)}
+                        onclick={() => handleDeleteComment(comment._id)}
                       >
                         Delete
                       </button>
@@ -718,7 +752,7 @@
                             <button
                               type="button"
                               class="text-[10px] font-mono text-[#888] underline"
-                              on:click={() => {
+                              onclick={() => {
                                 handleTimestampClick(reply.timestampSeconds);
                                 handleMarkerClick(reply._id);
                               }}
@@ -730,7 +764,7 @@
                             <button
                               type="button"
                               class="text-[10px] font-bold uppercase tracking-wider text-[#dc2626]"
-                              on:click={() => handleDeleteComment(reply._id)}
+                              onclick={() => handleDeleteComment(reply._id)}
                             >
                               Delete
                             </button>
@@ -760,7 +794,7 @@
               type="button"
               class="mt-3 inline-flex items-center justify-center border-2 border-[#1a1a1a] bg-[#1a1a1a] px-3 py-2 text-sm font-bold text-[#f0f0e8] hover:bg-[#2d5a2d] disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!commentText.trim()}
-              on:click={handleCreateComment}
+              onclick={handleCreateComment}
             >
               Add comment
             </button>
@@ -781,7 +815,7 @@
           <button
             type="button"
             class="inline-flex h-8 w-8 items-center justify-center border-2 border-[#1a1a1a]"
-            on:click={() => (mobileCommentsOpen = false)}
+            onclick={() => (mobileCommentsOpen = false)}
           >
             <X class="h-4 w-4" />
           </button>
@@ -797,7 +831,7 @@
                     <button
                       type="button"
                       class="mt-1 block text-xs font-mono text-[#888] underline"
-                      on:click={() => {
+                      onclick={() => {
                         handleTimestampClick(comment.timestampSeconds);
                         mobileCommentsOpen = false;
                       }}
@@ -809,7 +843,7 @@
                     <button
                       type="button"
                       class="text-[10px] font-bold uppercase tracking-wider text-[#888]"
-                      on:click={() => handleToggleResolved(comment._id)}
+                      onclick={() => handleToggleResolved(comment._id)}
                     >
                       {comment.resolved ? "Reopen" : "Resolve"}
                     </button>
@@ -835,7 +869,7 @@
               type="button"
               class="mt-3 inline-flex items-center justify-center border-2 border-[#1a1a1a] bg-[#1a1a1a] px-3 py-2 text-sm font-bold text-[#f0f0e8] hover:bg-[#2d5a2d] disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!commentText.trim()}
-              on:click={handleCreateComment}
+              onclick={handleCreateComment}
             >
               Add comment
             </button>
@@ -848,6 +882,14 @@
       videoId={resolvedVideoId}
       open={shareDialogOpen}
       onOpenChange={(open) => (shareDialogOpen = open)}
+    />
+
+    <ManageVideoTagsDialog
+      open={manageTagsOpen}
+      projectId={resolvedProjectId ?? null}
+      teamId={resolvedTeamId}
+      selectedVideos={selectedVideosForTags}
+      onOpenChange={(open) => (manageTagsOpen = open)}
     />
   </div>
 {/if}
